@@ -15,6 +15,12 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
+    let stderr_file: Option<PathBuf> = noargs::opt("stderr-file")
+        .short('e')
+        .doc("File to write LSP server stderr to")
+        .take(&mut args)
+        .present_and_then(|o| o.value().parse())?;
+
     let lsp_server_command: PathBuf = noargs::arg("LSP_SERVER_COMMAND")
         .example("/path/to/lsp-server")
         .take(&mut args)
@@ -33,7 +39,7 @@ fn main() -> noargs::Result<()> {
         return Ok(());
     }
 
-    let lsp_client = LspClient::new(lsp_server_command, lsp_server_args).or_fail()?;
+    let lsp_client = LspClient::new(lsp_server_command, lsp_server_args, stderr_file).or_fail()?;
     let app = App::new(lsp_client).or_fail()?;
     app.run().or_fail()?;
 
