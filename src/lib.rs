@@ -1,1 +1,2 @@
 pub mod app;
+pub mod lsp_client;
