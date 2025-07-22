@@ -1,12 +1,14 @@
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
-use std::process::{Child, ChildStderr, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 
 use orfail::OrFail;
 
 #[derive(Debug)]
 pub struct LspClient {
     process: Child,
+    pub stdin: ChildStdin,
+    pub stdout: ChildStdout,
     pub stderr: ChildStderr,
 }
 
@@ -25,9 +27,21 @@ impl LspClient {
             )
         })?;
 
+        let stdin = process.stdin.take().or_fail()?;
+        tuinix::set_nonblocking(stdin.as_raw_fd()).or_fail()?;
+
+        let stdout = process.stdout.take().or_fail()?;
+        tuinix::set_nonblocking(stdout.as_raw_fd()).or_fail()?;
+
         let stderr = process.stderr.take().or_fail()?;
         tuinix::set_nonblocking(stderr.as_raw_fd()).or_fail()?;
-        Ok(Self { stderr, process })
+
+        Ok(Self {
+            stdin,
+            stdout,
+            stderr,
+            process,
+        })
     }
 }
 

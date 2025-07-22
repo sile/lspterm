@@ -1,7 +1,12 @@
 use orfail::OrFail;
 use tuinix::{KeyCode, Terminal, TerminalEvent, TerminalInput};
 
-use crate::{lsp_client::LspClient, mame::TerminalFrame, state::State};
+use crate::{
+    lsp_client::LspClient,
+    mame::TerminalFrame,
+    state::State,
+    tuinix_ext::{ExtendedTerminalEvent, TerminalExt},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Tab {
@@ -49,8 +54,12 @@ impl App {
 
         // Event loop
         loop {
-            match self.terminal.poll_event(None).or_fail()? {
-                Some(TerminalEvent::Input(input)) => {
+            match self
+                .terminal
+                .poll_event_with_lsp(&self.lsp_client, None)
+                .or_fail()?
+            {
+                Some(ExtendedTerminalEvent::Terminal(TerminalEvent::Input(input))) => {
                     let TerminalInput::Key(key_input) = input;
 
                     match key_input.code {
@@ -79,9 +88,19 @@ impl App {
                     // Redraw the UI after input
                     self.render().or_fail()?;
                 }
-                Some(TerminalEvent::Resize(_size)) => {
+                Some(ExtendedTerminalEvent::Terminal(TerminalEvent::Resize(_size))) => {
                     // Terminal was resized, redraw UI
                     self.render().or_fail()?;
+                }
+                Some(ExtendedTerminalEvent::LspStdout) => {
+                    // Handle LSP stdout data
+                    // You can read from lsp_client.stdout here
+                    // TODO: Read and process LSP messages
+                }
+                Some(ExtendedTerminalEvent::LspStderr) => {
+                    // Handle LSP stderr data
+                    // You can read from lsp_client.stderr here
+                    // TODO: Read and process LSP error messages
                 }
                 None => {
                     // Timeout elapsed, no events to process
