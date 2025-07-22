@@ -1,7 +1,7 @@
 use orfail::OrFail;
 use tuinix::{KeyCode, Terminal, TerminalEvent, TerminalInput};
 
-use crate::{lsp_client::LspClient, mame::TerminalFrame};
+use crate::{lsp_client::LspClient, mame::TerminalFrame, state::State};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Tab {
@@ -27,6 +27,7 @@ impl Tab {
 #[derive(Debug)]
 pub struct App {
     terminal: Terminal,
+    state: State,
     lsp_client: LspClient,
     active_tab: Tab,
 }
@@ -36,6 +37,7 @@ impl App {
         let terminal = Terminal::new().or_fail()?;
         Ok(Self {
             terminal,
+            state: State::new(),
             lsp_client,
             active_tab: Tab::Main, // Default tab
         })
