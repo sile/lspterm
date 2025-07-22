@@ -1,3 +1,4 @@
+use std::io::{BufRead, BufReader};
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
@@ -9,7 +10,7 @@ pub struct LspClient {
     process: Child,
     pub stdin: ChildStdin,
     pub stdout: ChildStdout,
-    pub stderr: ChildStderr,
+    pub stderr: BufReader<ChildStderr>,
 }
 
 impl LspClient {
@@ -39,9 +40,18 @@ impl LspClient {
         Ok(Self {
             stdin,
             stdout,
-            stderr,
+            stderr: BufReader::new(stderr),
             process,
         })
+    }
+
+    pub fn read_stderr_line(&mut self) -> orfail::Result<Option<String>> {
+        let mut line = String::new();
+        match self.stderr.read_line(&mut line) {
+            Ok(_) => Ok(Some(line)),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(None),
+            Err(e) => Err(e).or_fail(),
+        }
     }
 }
 

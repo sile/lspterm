@@ -55,7 +55,7 @@ impl TerminalExt for Terminal {
 
                 // Add LSP client file descriptors
                 let lsp_stdout_fd = lsp_client.stdout.as_raw_fd();
-                let lsp_stderr_fd = lsp_client.stderr.as_raw_fd();
+                let lsp_stderr_fd = lsp_client.stderr.get_ref().as_raw_fd();
                 libc::FD_SET(lsp_stdout_fd, readfds.as_mut_ptr());
                 libc::FD_SET(lsp_stderr_fd, readfds.as_mut_ptr());
 

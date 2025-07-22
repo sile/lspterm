@@ -93,19 +93,12 @@ impl App {
                     self.render().or_fail()?;
                 }
                 Some(ExtendedTerminalEvent::LspStdout) => {
-                    // Handle LSP stdout data
-                    // You can read from lsp_client.stdout here
-                    // TODO: Read and process LSP messages
+                    todo!(); //
                 }
                 Some(ExtendedTerminalEvent::LspStderr) => {
-                    // Handle LSP stderr data
-                    // You can read from lsp_client.stderr here
-                    // TODO: Read and process LSP error messages
+                    todo!(); //
                 }
-                None => {
-                    // Timeout elapsed, no events to process
-                    // TODO: Add periodic updates here if needed
-                }
+                None => {}
             }
         }
 
