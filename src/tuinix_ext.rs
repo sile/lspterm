@@ -34,6 +34,8 @@ impl TerminalExt for Terminal {
     ) -> std::io::Result<Option<ExtendedTerminalEvent>> {
         use std::os::fd::AsRawFd;
 
+        dbg!("here");
+
         // First check if there's already buffered terminal input
         if let Some(input) = self.read_input()? {
             return Ok(Some(ExtendedTerminalEvent::Terminal(TerminalEvent::Input(
@@ -67,6 +69,7 @@ impl TerminalExt for Terminal {
                     .max()
                     .copied()
                     .unwrap_or(0);
+                dbg!(maxfd);
 
                 // Set up timeout
                 let mut timeval = MaybeUninit::<libc::timeval>::zeroed();
@@ -103,6 +106,8 @@ impl TerminalExt for Terminal {
                     return Ok(None);
                 }
 
+                dbg!("here");
+
                 // Check which file descriptor has data available
                 if libc::FD_ISSET(stdin_fd, &readfds) {
                     if let Some(input) = self.read_input()? {
@@ -118,6 +123,8 @@ impl TerminalExt for Terminal {
                         TerminalEvent::Resize(size),
                     )));
                 }
+
+                dbg!("here");
 
                 if libc::FD_ISSET(lsp_stdout_fd, &readfds) {
                     return Ok(Some(ExtendedTerminalEvent::LspStdout));

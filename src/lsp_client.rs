@@ -47,9 +47,9 @@ impl LspClient {
 
     pub fn read_stderr_line(&mut self) -> orfail::Result<Option<String>> {
         let mut line = String::new();
-        match self.stderr.read_line(&mut line) {
-            Ok(_) => Ok(Some(line)),
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(None),
+        match tuinix::try_nonblocking(self.stderr.read_line(&mut line)) {
+            Ok(Some(_)) => Ok(Some(line)),
+            Ok(None) => Ok(None),
             Err(e) => Err(e).or_fail(),
         }
     }
