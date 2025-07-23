@@ -86,8 +86,12 @@ impl App {
                     // Terminal was resized, redraw UI
                     self.render().or_fail()?;
                 }
-                Some(TerminalEvent::FdReady { .. }) => {
-                    dbg!(self.lsp_client.read_stderr_line().or_fail()?);
+                Some(TerminalEvent::FdReady { fd, .. }) => {
+                    if self.lsp_client.stderr_fd() == Some(fd)
+                        && let Some(line) = self.lsp_client.read_stderr_line().or_fail()?
+                    {
+                        self.state.console_log.push(line);
+                    }
                 }
                 None => {}
             }
@@ -165,8 +169,10 @@ impl App {
 
         writeln!(frame, "Console View").or_fail()?;
         writeln!(frame, "").or_fail()?;
-        writeln!(frame, "LSP Console output will appear here.").or_fail()?;
-        writeln!(frame, "TODO: Display LSP server communication").or_fail()?;
+        for line in self.state.console_log.iter().rev().take(10) {
+            let line = line.trim();
+            writeln!(frame, "LSP-SERVER-STDERR> {line}").or_fail()?;
+        }
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 #[derive(Debug)]
 pub struct State {
-    console_log: Vec<ConsoleLogEntry>,
+    pub console_log: Vec<String>,
 }
 
 impl State {
@@ -9,9 +9,4 @@ impl State {
             console_log: Vec::new(),
         }
     }
-}
-
-#[derive(Debug)]
-pub enum ConsoleLogEntry {
-    LspServerStderr(String),
 }
