@@ -1,12 +1,7 @@
 use orfail::OrFail;
 use tuinix::{KeyCode, Terminal, TerminalEvent, TerminalInput};
 
-use crate::{
-    lsp_client::LspClient,
-    mame::TerminalFrame,
-    state::State,
-    tuinix_ext::{ExtendedTerminalEvent, TerminalExt},
-};
+use crate::{lsp_client::LspClient, mame::TerminalFrame, state::State};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Tab {
@@ -54,13 +49,12 @@ impl App {
 
         // Event loop
         loop {
-            match self
-                .terminal
-                .poll_event_with_lsp(&self.lsp_client, None)
-                .or_fail()?
-            {
-                Some(ExtendedTerminalEvent::Terminal(TerminalEvent::Input(input))) => {
-                    let TerminalInput::Key(key_input) = input;
+            let readfds = self.lsp_client.stderr_fd().into_iter().collect::<Vec<_>>();
+            match self.terminal.poll_event(&readfds, &[], None).or_fail()? {
+                Some(TerminalEvent::Input(input)) => {
+                    let TerminalInput::Key(key_input) = input else {
+                        unreachable!("mouse input has not been enabled");
+                    };
 
                     match key_input.code {
                         // Handle quit command
@@ -88,15 +82,12 @@ impl App {
                     // Redraw the UI after input
                     self.render().or_fail()?;
                 }
-                Some(ExtendedTerminalEvent::Terminal(TerminalEvent::Resize(_size))) => {
+                Some(TerminalEvent::Resize(_size)) => {
                     // Terminal was resized, redraw UI
                     self.render().or_fail()?;
                 }
-                Some(ExtendedTerminalEvent::LspStdout) => {
-                    todo!(); //
-                }
-                Some(ExtendedTerminalEvent::LspStderr) => {
-                    todo!(); //
+                Some(TerminalEvent::FdReady { .. }) => {
+                    dbg!(self.lsp_client.read_stderr_line().or_fail()?);
                 }
                 None => {}
             }

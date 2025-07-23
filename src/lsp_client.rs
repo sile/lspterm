@@ -1,5 +1,5 @@
 use std::io::{BufRead, BufReader};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 
@@ -10,7 +10,7 @@ pub struct LspClient {
     process: Child,
     pub stdin: ChildStdin,
     pub stdout: ChildStdout,
-    pub stderr: BufReader<ChildStderr>,
+    stderr: Option<BufReader<ChildStderr>>,
 }
 
 impl LspClient {
@@ -40,14 +40,26 @@ impl LspClient {
         Ok(Self {
             stdin,
             stdout,
-            stderr: BufReader::new(stderr),
+            stderr: Some(BufReader::new(stderr)),
             process,
         })
     }
 
+    pub fn stderr_fd(&self) -> Option<RawFd> {
+        self.stderr.as_ref().map(|x| x.get_ref().as_raw_fd())
+    }
+
     pub fn read_stderr_line(&mut self) -> orfail::Result<Option<String>> {
+        let Some(reader) = &mut self.stderr else {
+            return Ok(None);
+        };
+
         let mut line = String::new();
-        match tuinix::try_nonblocking(self.stderr.read_line(&mut line)) {
+        match tuinix::try_nonblocking(reader.read_line(&mut line)) {
+            Ok(Some(0)) => {
+                self.stderr = None;
+                Ok(None)
+            }
             Ok(Some(_)) => Ok(Some(line)),
             Ok(None) => Ok(None),
             Err(e) => Err(e).or_fail(),
