@@ -28,6 +28,8 @@ fn main() -> noargs::Result<()> {
         lsp_server_args.push(arg);
     }
 
+    // TODO: --lsp-client-messages-file, --lsp-server-messages-file,  --lsp-server-stderr-file
+
     if let Some(help) = args.finish()? {
         print!("{help}");
         return Ok(());

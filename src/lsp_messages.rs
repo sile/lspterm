@@ -19,7 +19,7 @@ impl nojson::DisplayJson for InitializeRequest {
             f.member(
                 "workspaceFolders",
                 [json_object(|f| {
-                    f.member("uri", &self.workspace_folder)?;
+                    f.member("uri", format!("file://{}", self.workspace_folder.display()))?;
                     f.member("name", "main")
                 })],
             )?;
