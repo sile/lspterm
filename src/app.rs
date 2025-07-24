@@ -111,7 +111,10 @@ impl App {
                     {
                         self.state.console_log.push(line);
                     } else if self.lsp_client.stdout_fd() == Some(fd) {
-                        todo!()
+                        let response_json = self.lsp_client.recv_response_json().or_fail()?;
+                        if !response_json.is_empty() {
+                            return Err(orfail::Failure::new(response_json));
+                        }
                     }
                 }
                 None => {}

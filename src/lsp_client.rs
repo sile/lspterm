@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
@@ -55,6 +55,16 @@ impl LspClient {
         write!(self.stdin, "{content}").or_fail()?;
         self.stdin.flush().or_fail()?;
         Ok(())
+    }
+
+    pub fn recv_response_json(&mut self) -> orfail::Result<String> {
+        let Some(reader) = &mut self.stdout else {
+            todo!();
+        };
+
+        let mut buf = vec![0; 4096];
+        let size = reader.read(&mut buf).or_fail()?;
+        Ok(String::from_utf8_lossy(&buf[..size]).into_owned())
     }
 
     pub fn stdout_fd(&self) -> Option<RawFd> {

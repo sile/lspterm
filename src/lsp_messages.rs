@@ -10,14 +10,14 @@ impl nojson::DisplayJson for InitializeRequest {
     fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
         fmt_request(f, self.id, "initialize", |f| {
             f.member(
-                "client_info",
+                "clientInfo",
                 json_object(|f| {
                     f.member("name", env!("CARGO_PKG_NAME"))?;
                     f.member("version", env!("CARGO_PKG_VERSION"))
                 }),
             )?;
             f.member(
-                "workspace_folders",
+                "workspaceFolders",
                 [json_object(|f| {
                     f.member("uri", &self.workspace_folder)?;
                     f.member("name", "main")
@@ -28,7 +28,7 @@ impl nojson::DisplayJson for InitializeRequest {
                 json_object(|f| {
                     f.member(
                         "general",
-                        json_object(|f| f.member("position_encodings", ["utf-8"])),
+                        json_object(|f| f.member("positionEncodings", ["utf-8"])),
                     )
                 }),
             )?;
@@ -54,7 +54,7 @@ where
     F: Fn(&mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result,
 {
     f.object(|f| {
-        f.member("jsonrpc", "2")?;
+        f.member("jsonrpc", "2.0")?;
         f.member("id", id)?;
         f.member("method", method)?;
         f.member("params", nojson::json(|f| f.object(|f| params(f))))
