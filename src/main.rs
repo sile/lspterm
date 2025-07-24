@@ -1,8 +1,4 @@
-use std::path::PathBuf;
-
 use orfail::OrFail;
-
-use lspterm::{app::App, lsp_client::LspClient};
 
 fn main() -> noargs::Result<()> {
     let mut args = noargs::raw_args();
@@ -15,33 +11,41 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
-    let log_dir: Option<PathBuf> = noargs::opt("log-dir")
-        .short('l')
-        .doc("Directory to store LSP log files")
-        .take(&mut args)
-        .present_and_then(|o| o.value().parse())?;
-
-    let lsp_server_command: PathBuf = noargs::arg("LSP_SERVER_COMMAND")
-        .example("/path/to/lsp-server")
-        .take(&mut args)
-        .then(|a| a.value().parse())?;
-
-    let mut lsp_server_args: Vec<String> = Vec::new();
-    while let Some(arg) = noargs::arg("[LSP_SERVER_ARG]...")
-        .take(&mut args)
-        .present_and_then(|a| a.value().parse())?
-    {
-        lsp_server_args.push(arg);
-    }
+    let Some(args) = lspterm::subcommand_initialize::try_run(args).or_fail()? else {
+        return Ok(());
+    };
 
     if let Some(help) = args.finish()? {
         print!("{help}");
-        return Ok(());
     }
 
-    let lsp_client = LspClient::new(lsp_server_command, lsp_server_args, log_dir).or_fail()?;
-    let app = App::new(lsp_client).or_fail()?;
-    app.run().or_fail()?;
+    // let log_dir: Option<PathBuf> = noargs::opt("log-dir")
+    //     .short('l')
+    //     .doc("Directory to store LSP log files")
+    //     .take(&mut args)
+    //     .present_and_then(|o| o.value().parse())?;
+
+    // let lsp_server_command: PathBuf = noargs::arg("LSP_SERVER_COMMAND")
+    //     .example("/path/to/lsp-server")
+    //     .take(&mut args)
+    //     .then(|a| a.value().parse())?;
+
+    // let mut lsp_server_args: Vec<String> = Vec::new();
+    // while let Some(arg) = noargs::arg("[LSP_SERVER_ARG]...")
+    //     .take(&mut args)
+    //     .present_and_then(|a| a.value().parse())?
+    // {
+    //     lsp_server_args.push(arg);
+    // }
+
+    // if let Some(help) = args.finish()? {
+    //     print!("{help}");
+    //     return Ok(());
+    // }
+
+    // let lsp_client = LspClient::new(lsp_server_command, lsp_server_args, log_dir).or_fail()?;
+    // let app = App::new(lsp_client).or_fail()?;
+    // app.run().or_fail()?;
 
     Ok(())
 }
