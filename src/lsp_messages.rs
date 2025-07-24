@@ -1,43 +1,57 @@
+use std::path::PathBuf;
+
 #[derive(Debug)]
-pub struct Initialization {}
+pub struct InitializeRequest {
+    pub id: u64,
+    pub workspace_folder: PathBuf,
+}
 
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub struct RequestMessage {
-//     jsonrpc: JsonrpcVersion,
-//     pub id: RequestId,
-//     pub method: String,
-//     #[serde(default)]
-//     pub params: serde_json::Value,
-// }
+impl nojson::DisplayJson for InitializeRequest {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        fmt_request(f, self.id, "initialize", |f| {
+            f.member(
+                "client_info",
+                json_object(|f| {
+                    f.member("name", env!("CARGO_PKG_NAME"))?;
+                    f.member("version", env!("CARGO_PKG_VERSION"))
+                }),
+            )?;
+            f.member(
+                "workspace_folders",
+                [json_object(|f| {
+                    f.member("uri", &self.workspace_folder)?;
+                    f.member("name", "main")
+                })],
+            )?;
+            f.member("capabilities", ())?;
+            Ok(())
+        })
+    }
+}
 
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct InitializeParams {
-//     #[serde(default)]
-//     pub root_uri: Option<DocumentUri>,
-//     pub client_info: Option<ClientInfo>,
-//     pub capabilities: ClientCapabilities,
-//     #[serde(default)]
-//     pub workspace_folders: Vec<WorkspaceFolder>,
-// }
+fn json_object<F>(members: F) -> impl nojson::DisplayJson
+where
+    F: Fn(&mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result,
+{
+    nojson::json(move |f| f.object(|f| members(f)))
+}
 
-// impl InitializeParams {
-//     pub fn root_uri(&self) -> orfail::Result<&DocumentUri> {
-//         self.root_uri
-//             .as_ref()
-//             .or_else(|| self.workspace_folders.first().map(|f| &f.uri))
-//             .or_fail_with(|()| "rootUri or workspaceFoldersa is required".to_owned())
-//     }
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-// pub struct DocumentUri(url::Url);
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub struct ClientInfo {
-//     pub name: String,
-//     pub version: String,
-// }
+fn fmt_request<F>(
+    f: &mut nojson::JsonFormatter<'_, '_>,
+    id: u64,
+    method: &str,
+    params: F,
+) -> std::fmt::Result
+where
+    F: Fn(&mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result,
+{
+    f.object(|f| {
+        f.member("jsonrpc", "2")?;
+        f.member("id", id)?;
+        f.member("method", method)?;
+        f.member("params", nojson::json(|f| f.object(|f| params(f))))
+    })
+}
 
 // #[derive(Debug, Clone, Serialize, Deserialize)]
 // #[serde(rename_all = "camelCase")]
@@ -70,11 +84,4 @@ pub struct Initialization {}
 //     Utf16,
 //     #[serde(rename = "utf-32")]
 //     Utf32,
-// }
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct WorkspaceFolder {
-//     pub uri: DocumentUri,
-//     pub name: String,
 // }
