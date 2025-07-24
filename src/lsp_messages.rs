@@ -23,7 +23,15 @@ impl nojson::DisplayJson for InitializeRequest {
                     f.member("name", "main")
                 })],
             )?;
-            f.member("capabilities", ())?;
+            f.member(
+                "capabilities",
+                json_object(|f| {
+                    f.member(
+                        "general",
+                        json_object(|f| f.member("position_encodings", ["utf-8"])),
+                    )
+                }),
+            )?;
             Ok(())
         })
     }
@@ -52,36 +60,3 @@ where
         f.member("params", nojson::json(|f| f.object(|f| params(f))))
     })
 }
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct ClientCapabilities {
-//     #[serde(default)]
-//     pub workspace: WorkspaceCapabilitylies,
-//     pub general: GeneralClientCapabilities,
-// }
-
-// #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct WorkspaceCapabilitylies {
-//     #[serde(default)]
-//     pub workspace_edit: WorkspaceEditClientCapabilities,
-// }
-
-// #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// pub struct GeneralClientCapabilities {
-//     #[serde(default)]
-//     pub position_encodings: Vec<PositionEncodingKind>,
-// }
-
-// #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// pub enum PositionEncodingKind {
-//     #[serde(rename = "utf-8")]
-//     Utf8,
-//     #[default]
-//     #[serde(rename = "utf-16")]
-//     Utf16,
-//     #[serde(rename = "utf-32")]
-//     Utf32,
-// }
