@@ -9,7 +9,7 @@ use orfail::OrFail;
 pub struct LspClient {
     process: Child,
     pub stdin: ChildStdin,
-    pub stdout: ChildStdout,
+    pub stdout: Option<ChildStdout>,
     stderr: Option<BufReader<ChildStderr>>,
 }
 
@@ -28,21 +28,25 @@ impl LspClient {
             )
         })?;
 
+        // TODO: Make stdin non-blocking
         let stdin = process.stdin.take().or_fail()?;
-        tuinix::set_nonblocking(stdin.as_raw_fd()).or_fail()?;
 
+        // TODO: Make stdout non-blocking
         let stdout = process.stdout.take().or_fail()?;
-        tuinix::set_nonblocking(stdout.as_raw_fd()).or_fail()?;
 
         let stderr = process.stderr.take().or_fail()?;
         tuinix::set_nonblocking(stderr.as_raw_fd()).or_fail()?;
 
         Ok(Self {
             stdin,
-            stdout,
+            stdout: Some(stdout),
             stderr: Some(BufReader::new(stderr)),
             process,
         })
+    }
+
+    pub fn stdout_fd(&self) -> Option<RawFd> {
+        self.stdout.as_ref().map(|x| x.as_raw_fd())
     }
 
     pub fn stderr_fd(&self) -> Option<RawFd> {

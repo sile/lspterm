@@ -49,7 +49,10 @@ impl App {
 
         // Event loop
         loop {
-            let readfds = self.lsp_client.stderr_fd().into_iter().collect::<Vec<_>>();
+            let readfds = [self.lsp_client.stdout_fd(), self.lsp_client.stderr_fd()]
+                .into_iter()
+                .filter_map(|v| v)
+                .collect::<Vec<_>>();
             match self.terminal.poll_event(&readfds, &[], None).or_fail()? {
                 Some(TerminalEvent::Input(input)) => {
                     let TerminalInput::Key(key_input) = input else {
@@ -91,6 +94,8 @@ impl App {
                         && let Some(line) = self.lsp_client.read_stderr_line().or_fail()?
                     {
                         self.state.console_log.push(line);
+                    } else if self.lsp_client.stdout_fd() == Some(fd) {
+                        todo!()
                     }
                 }
                 None => {}
