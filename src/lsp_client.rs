@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::os::fd::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
@@ -43,6 +43,18 @@ impl LspClient {
             stderr: Some(BufReader::new(stderr)),
             process,
         })
+    }
+
+    pub fn send<T>(&mut self, request: T) -> orfail::Result<()>
+    where
+        T: nojson::DisplayJson,
+    {
+        let content = nojson::Json(request).to_string();
+        write!(self.stdin, "Content-length: {}\r\n", content.len()).or_fail()?;
+        write!(self.stdin, "\r\n").or_fail()?;
+        write!(self.stdin, "{content}").or_fail()?;
+        self.stdin.flush().or_fail()?;
+        Ok(())
     }
 
     pub fn stdout_fd(&self) -> Option<RawFd> {

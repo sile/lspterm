@@ -1,7 +1,9 @@
 use orfail::OrFail;
 use tuinix::{KeyCode, Terminal, TerminalEvent, TerminalInput};
 
-use crate::{lsp_client::LspClient, mame::TerminalFrame, state::State};
+use crate::{
+    lsp_client::LspClient, lsp_messages::InitializeRequest, mame::TerminalFrame, state::State,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Tab {
@@ -30,6 +32,7 @@ pub struct App {
     state: State,
     lsp_client: LspClient,
     active_tab: Tab,
+    next_request_id: u64,
 }
 
 impl App {
@@ -40,12 +43,25 @@ impl App {
             state: State::new(),
             lsp_client,
             active_tab: Tab::Main, // Default tab
+            next_request_id: 0,
         })
+    }
+
+    fn next_request_id(&mut self) -> u64 {
+        let id = self.next_request_id;
+        self.next_request_id += 1;
+        id
     }
 
     pub fn run(mut self) -> orfail::Result<()> {
         // Draw initial frame
         self.render().or_fail()?;
+
+        let req = InitializeRequest {
+            id: self.next_request_id(),
+            workspace_folder: std::env::current_dir().or_fail()?,
+        };
+        self.lsp_client.send(req).or_fail()?;
 
         // Event loop
         loop {
