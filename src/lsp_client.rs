@@ -7,6 +7,46 @@ use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use orfail::OrFail;
 
 #[derive(Debug)]
+pub struct LspServerSpec {
+    pub command: PathBuf,
+    pub args: Vec<String>,
+}
+
+impl LspServerSpec {
+    pub fn parse_args(args: &mut noargs::RawArgs) -> noargs::Result<Self> {
+        noargs::opt("lsp-server")
+            .short('s')
+            .env("LSPTERM_LSP_SERVER")
+            .example("/path/to/lsp-server")
+            .take(args)
+            .then(|a| a.value().parse())
+    }
+}
+
+impl std::str::FromStr for LspServerSpec {
+    type Err = nojson::JsonParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if !s.starts_with('{') {
+            return Ok(Self {
+                command: PathBuf::from(s),
+                args: Vec::new(),
+            });
+        }
+
+        let json = nojson::RawJson::parse(s)?;
+        let value = json.value();
+        Ok(Self {
+            command: value.to_member("command")?.required()?.try_into()?,
+            args: value
+                .to_member("args")?
+                .map(|v| v.try_into())?
+                .unwrap_or_default(),
+        })
+    }
+}
+
+#[derive(Debug)]
 enum Logger {
     Null,
     File { messages: File, server_stderr: File },
