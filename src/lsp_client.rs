@@ -9,11 +9,7 @@ use orfail::OrFail;
 #[derive(Debug)]
 enum Logger {
     Null,
-    File {
-        client_messages: File,
-        server_messages: File,
-        server_stderr: File,
-    },
+    File { messages: File, server_stderr: File },
 }
 
 impl Logger {
@@ -29,20 +25,30 @@ impl Logger {
             )
         })?;
 
-        let client_messages = File::create(log_dir.join("client_messages.jsonl"))
-            .or_fail_with(|e| format!("failed to create client messages log file: {e}"))?;
-
-        let server_messages = File::create(log_dir.join("server_messages.jsonl"))
-            .or_fail_with(|e| format!("failed to create server messages log file: {e}"))?;
+        let messages = File::create(log_dir.join("messages.jsonl"))
+            .or_fail_with(|e| format!("failed to create messages log file: {e}"))?;
 
         let server_stderr = File::create(log_dir.join("server_stderr.log"))
             .or_fail_with(|e| format!("failed to create server stderr log file: {e}"))?;
 
         Ok(Logger::File {
-            client_messages,
-            server_messages,
+            messages,
             server_stderr,
         })
+    }
+
+    fn log_message(&mut self, message: &str) -> orfail::Result<()> {
+        if let Logger::File { messages, .. } = self {
+            writeln!(messages, "{message}").or_fail()?;
+        }
+        Ok(())
+    }
+
+    fn log_server_stderr(&mut self, line: &str) -> orfail::Result<()> {
+        if let Logger::File { server_stderr, .. } = self {
+            writeln!(server_stderr, "{line}").or_fail()?;
+        }
+        Ok(())
     }
 }
 
@@ -97,6 +103,7 @@ impl LspClient {
         T: nojson::DisplayJson,
     {
         let content = nojson::Json(request).to_string();
+        self.logger.log_message(&content).or_fail()?;
         write!(self.stdin, "Content-length: {}\r\n", content.len()).or_fail()?;
         write!(self.stdin, "\r\n").or_fail()?;
         write!(self.stdin, "{content}").or_fail()?;
@@ -133,7 +140,11 @@ impl LspClient {
                 self.stderr = None;
                 Ok(None)
             }
-            Ok(Some(_)) => Ok(Some(line)),
+            Ok(Some(_)) => {
+                let line = line.trim_end().to_owned();
+                self.logger.log_server_stderr(&line).or_fail()?;
+                Ok(Some(line))
+            }
             Ok(None) => Ok(None),
             Err(e) => Err(e).or_fail(),
         }
