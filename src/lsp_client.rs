@@ -1,3 +1,4 @@
+use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::{AsRawFd, RawFd};
 use std::path::PathBuf;
@@ -6,15 +7,60 @@ use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use orfail::OrFail;
 
 #[derive(Debug)]
+enum Logger {
+    Null,
+    File {
+        client_messages: File,
+        server_messages: File,
+        server_stderr: File,
+    },
+}
+
+impl Logger {
+    fn new(log_dir: Option<PathBuf>) -> orfail::Result<Self> {
+        let Some(log_dir) = log_dir else {
+            return Ok(Logger::Null);
+        };
+
+        std::fs::create_dir_all(&log_dir).or_fail_with(|e| {
+            format!(
+                "failed to create log directory '{}': {e}",
+                log_dir.display()
+            )
+        })?;
+
+        let client_messages = File::create(log_dir.join("client_messages.jsonl"))
+            .or_fail_with(|e| format!("failed to create client messages log file: {e}"))?;
+
+        let server_messages = File::create(log_dir.join("server_messages.jsonl"))
+            .or_fail_with(|e| format!("failed to create server messages log file: {e}"))?;
+
+        let server_stderr = File::create(log_dir.join("server_stderr.log"))
+            .or_fail_with(|e| format!("failed to create server stderr log file: {e}"))?;
+
+        Ok(Logger::File {
+            client_messages,
+            server_messages,
+            server_stderr,
+        })
+    }
+}
+
+#[derive(Debug)]
 pub struct LspClient {
     process: Child,
     pub stdin: ChildStdin,
     pub stdout: Option<ChildStdout>,
     stderr: Option<BufReader<ChildStderr>>,
+    logger: Logger,
 }
 
 impl LspClient {
-    pub fn new(lsp_server_command: PathBuf, lsp_server_args: Vec<String>) -> orfail::Result<Self> {
+    pub fn new(
+        lsp_server_command: PathBuf,
+        lsp_server_args: Vec<String>,
+        log_dir: Option<PathBuf>,
+    ) -> orfail::Result<Self> {
         let mut command = Command::new(&lsp_server_command);
         command
             .args(&lsp_server_args)
@@ -42,6 +88,7 @@ impl LspClient {
             stdout: Some(stdout),
             stderr: Some(BufReader::new(stderr)),
             process,
+            logger: Logger::new(log_dir).or_fail()?,
         })
     }
 

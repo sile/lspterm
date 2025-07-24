@@ -15,6 +15,12 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
+    let log_dir: Option<PathBuf> = noargs::opt("log-dir")
+        .short('l')
+        .doc("Directory to store LSP log files")
+        .take(&mut args)
+        .present_and_then(|o| o.value().parse())?;
+
     let lsp_server_command: PathBuf = noargs::arg("LSP_SERVER_COMMAND")
         .example("/path/to/lsp-server")
         .take(&mut args)
@@ -28,14 +34,12 @@ fn main() -> noargs::Result<()> {
         lsp_server_args.push(arg);
     }
 
-    // TODO: --lsp-client-messages-file, --lsp-server-messages-file,  --lsp-server-stderr-file
-
     if let Some(help) = args.finish()? {
         print!("{help}");
         return Ok(());
     }
 
-    let lsp_client = LspClient::new(lsp_server_command, lsp_server_args).or_fail()?;
+    let lsp_client = LspClient::new(lsp_server_command, lsp_server_args, log_dir).or_fail()?;
     let app = App::new(lsp_client).or_fail()?;
     app.run().or_fail()?;
 
