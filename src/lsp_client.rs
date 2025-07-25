@@ -47,7 +47,23 @@ impl std::str::FromStr for LspServerSpec {
 }
 
 #[derive(Debug)]
+pub struct LspClientOptions {
+    pub server_spec: LspServerSpec,
+    pub verbose: bool,
+}
+
+impl LspClientOptions {
+    pub fn parse_args(args: &mut noargs::RawArgs) -> noargs::Result<Self> {
+        Ok(Self {
+            server_spec: LspServerSpec::parse_args(args)?,
+            verbose: noargs::flag("verbose").short('v').take(args).is_present(),
+        })
+    }
+}
+
+#[derive(Debug)]
 pub struct LspClient {
+    options: LspClientOptions,
     process: Child,
     pub stdin: ChildStdin,
     pub stdout: Option<ChildStdout>,
@@ -55,23 +71,24 @@ pub struct LspClient {
 }
 
 impl LspClient {
-    pub fn new(lsp_server_spec: LspServerSpec) -> orfail::Result<Self> {
-        let mut command = Command::new(&lsp_server_spec.command);
+    pub fn new(options: LspClientOptions) -> orfail::Result<Self> {
+        let mut command = Command::new(&options.server_spec.command);
         command
-            .args(&lsp_server_spec.args)
+            .args(&options.server_spec.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
         let mut process = command.spawn().or_fail_with(|e| {
             format!(
                 "failed to spawn LSP server process '{}': {e}",
-                lsp_server_spec.command.display()
+                options.server_spec.command.display()
             )
         })?;
 
         let stdin = process.stdin.take().or_fail()?;
         let stdout = process.stdout.take().or_fail()?;
         Ok(Self {
+            options,
             stdin,
             stdout: Some(stdout),
             process,
@@ -91,6 +108,10 @@ impl LspClient {
         }))
         .to_string();
         self.next_request_id += 1;
+
+        if self.options.verbose {
+            eprintln!("{content}");
+        }
 
         write!(self.stdin, "Content-length: {}\r\n", content.len()).or_fail()?;
         write!(self.stdin, "\r\n").or_fail()?;
