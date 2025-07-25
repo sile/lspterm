@@ -66,7 +66,7 @@ pub struct LspClient {
     options: LspClientOptions,
     process: Child,
     pub stdin: ChildStdin,
-    pub stdout: Option<ChildStdout>,
+    pub stdout: ChildStdout,
     next_request_id: u64,
 }
 
@@ -90,13 +90,21 @@ impl LspClient {
         Ok(Self {
             options,
             stdin,
-            stdout: Some(stdout),
+            stdout,
             process,
             next_request_id: 0,
         })
     }
 
-    pub fn send_request<T>(&mut self, request: T) -> orfail::Result<()>
+    pub fn call<T>(&mut self, request: T) -> orfail::Result<T::Response>
+    where
+        T: JsonRpcRequest,
+    {
+        self.send_request(request).or_fail()?;
+        todo!()
+    }
+
+    fn send_request<T>(&mut self, request: T) -> orfail::Result<()>
     where
         T: JsonRpcRequest,
     {
@@ -121,11 +129,8 @@ impl LspClient {
         Ok(())
     }
 
-    pub fn recv_response_json(&mut self) -> orfail::Result<String> {
-        let Some(reader) = &mut self.stdout else {
-            todo!();
-        };
-
+    pub fn recv_response(&mut self) -> orfail::Result<String> {
+        let reader = &mut self.stdout;
         let mut buf = vec![0; 4096];
         let size = reader.read(&mut buf).or_fail()?;
         Ok(String::from_utf8_lossy(&buf[..size]).into_owned())

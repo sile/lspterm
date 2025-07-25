@@ -22,7 +22,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let mut lsp_client = LspClient::new(options).or_fail()?;
 
     let req = InitializeRequest::new().or_fail()?;
-    lsp_client.send_request(req).or_fail()?;
+    let res = lsp_client.call(req).or_fail()?;
 
     Ok(None)
 }
@@ -41,6 +41,8 @@ impl InitializeRequest {
 }
 
 impl JsonRpcRequest for InitializeRequest {
+    type Response = ();
+
     fn method(&self) -> &str {
         "initialize"
     }

@@ -1,4 +1,6 @@
 pub trait JsonRpcRequest {
+    type Response;
+
     fn method(&self) -> &str;
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result;
 }
