@@ -4,6 +4,8 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use orfail::OrFail;
 
+use crate::json::{JsonRpcRequest, json_object};
+
 #[derive(Debug)]
 pub struct LspServerSpec {
     pub command: PathBuf,
@@ -79,14 +81,22 @@ impl LspClient {
 
     pub fn send_request<T>(&mut self, request: T) -> orfail::Result<()>
     where
-        T: nojson::DisplayJson,
+        T: JsonRpcRequest,
     {
-        let content = nojson::Json(request).to_string();
+        let content = nojson::Json(json_object(|f| {
+            f.member("jsonrpc", "2.0")?;
+            f.member("id", self.next_request_id)?;
+            f.member("method", request.method())?;
+            f.member("params", json_object(|f| request.params(f)))
+        }))
+        .to_string();
+        self.next_request_id += 1;
+
         write!(self.stdin, "Content-length: {}\r\n", content.len()).or_fail()?;
         write!(self.stdin, "\r\n").or_fail()?;
         write!(self.stdin, "{content}").or_fail()?;
         self.stdin.flush().or_fail()?;
-        self.next_request_id += 1;
+
         Ok(())
     }
 
