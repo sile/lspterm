@@ -1,7 +1,6 @@
-use std::io::{BufRead, BufReader, Read, Write};
-use std::os::fd::{AsRawFd, RawFd};
+use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use orfail::OrFail;
 
@@ -50,7 +49,6 @@ pub struct LspClient {
     process: Child,
     pub stdin: ChildStdin,
     pub stdout: Option<ChildStdout>,
-    stderr: Option<BufReader<ChildStderr>>,
 }
 
 impl LspClient {
@@ -60,7 +58,7 @@ impl LspClient {
             .args(&lsp_server_spec.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stderr(Stdio::inherit());
         let mut process = command.spawn().or_fail_with(|e| {
             format!(
                 "failed to spawn LSP server process '{}': {e}",
@@ -68,19 +66,11 @@ impl LspClient {
             )
         })?;
 
-        // TODO: Make stdin non-blocking
         let stdin = process.stdin.take().or_fail()?;
-
-        // TODO: Make stdout non-blocking
         let stdout = process.stdout.take().or_fail()?;
-
-        let stderr = process.stderr.take().or_fail()?;
-        tuinix::set_nonblocking(stderr.as_raw_fd()).or_fail()?;
-
         Ok(Self {
             stdin,
             stdout: Some(stdout),
-            stderr: Some(BufReader::new(stderr)),
             process,
         })
     }
@@ -105,34 +95,6 @@ impl LspClient {
         let mut buf = vec![0; 4096];
         let size = reader.read(&mut buf).or_fail()?;
         Ok(String::from_utf8_lossy(&buf[..size]).into_owned())
-    }
-
-    pub fn stdout_fd(&self) -> Option<RawFd> {
-        self.stdout.as_ref().map(|x| x.as_raw_fd())
-    }
-
-    pub fn stderr_fd(&self) -> Option<RawFd> {
-        self.stderr.as_ref().map(|x| x.get_ref().as_raw_fd())
-    }
-
-    pub fn read_stderr_line(&mut self) -> orfail::Result<Option<String>> {
-        let Some(reader) = &mut self.stderr else {
-            return Ok(None);
-        };
-
-        let mut line = String::new();
-        match tuinix::try_nonblocking(reader.read_line(&mut line)) {
-            Ok(Some(0)) => {
-                self.stderr = None;
-                Ok(None)
-            }
-            Ok(Some(_)) => {
-                let line = line.trim_end().to_owned();
-                Ok(Some(line))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(e).or_fail(),
-        }
     }
 }
 

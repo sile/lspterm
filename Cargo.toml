@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-libc = "0.2.174"
 noargs = "0.4.1"
 nojson = "0.2.2"
 orfail = "1.1.0"
-tuinix = "0.3.0"
-unicode-width = "0.2.1"
