@@ -72,6 +72,12 @@ impl JsonRpcRequest for InitializeRequest {
             "capabilities",
             json_object(|f| {
                 f.member(
+                    "textDocument",
+                    json_object(|f| {
+                        f.member("definition", json_object(|f| f.member("linkSupport", true)))
+                    }),
+                )?;
+                f.member(
                     "general",
                     json_object(|f| f.member("positionEncodings", ["utf-8"])),
                 )

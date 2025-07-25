@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use orfail::OrFail;
 
 use crate::{
-    json::{JsonRpcRequest, JsonRpcResponse, JsonValue, json_object},
+    json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonValue, json_object},
     lsp_client::{LspClient, LspClientOptions},
     subcommand_initialize::initialize,
 };
@@ -33,11 +33,50 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     initialize(&mut lsp_client).or_fail()?;
     // TODO: capability check
 
+    let did_open = DidOpenNotification::new(&file).or_fail()?;
+    lsp_client.cast(did_open).or_fail()?;
+
     let req = DefinitionRequest::new(file, line, character).or_fail()?;
     let res = lsp_client.call(req).or_fail()?;
     println!("{}", nojson::Json(res.value));
 
     Ok(None)
+}
+
+#[derive(Debug)]
+pub struct DidOpenNotification {
+    file: PathBuf,
+    content: String,
+}
+
+impl DidOpenNotification {
+    pub fn new(file: &PathBuf) -> orfail::Result<Self> {
+        let content = std::fs::read_to_string(file)
+            .or_fail_with(|e| format!("failed to read file '{}': {e}", file.display()))?;
+        Ok(Self {
+            file: file.clone(),
+            content,
+        })
+    }
+}
+
+impl JsonRpcNotification for DidOpenNotification {
+    fn method(&self) -> &str {
+        "textDocument/didOpen"
+    }
+
+    fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
+        f.member(
+            "textDocument",
+            json_object(|f| {
+                f.member("uri", format!("file:///{}", self.file.display()))?;
+                f.member("languageId", "rust")?; // TODO
+                f.member("version", 1)?;
+                f.member("text", &self.content)
+            }),
+        )?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -67,7 +106,7 @@ impl JsonRpcRequest for DefinitionRequest {
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
         f.member(
             "textDocument",
-            json_object(|f| f.member("uri", format!("file://{}", self.file.display()))),
+            json_object(|f| f.member("uri", format!("file:///{}", self.file.display()))),
         )?;
         f.member(
             "position",
