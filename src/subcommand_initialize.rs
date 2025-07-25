@@ -23,14 +23,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     let req = InitializeRequest::new().or_fail()?;
     let res = lsp_client.call(req).or_fail()?;
-    println!(
-        "{}",
-        nojson::json(|f| {
-            f.set_indent_size(2);
-            f.set_spacing(true);
-            f.value(&res.value)
-        })
-    );
+    println!("{}", nojson::Json(res.value));
 
     Ok(None)
 }
