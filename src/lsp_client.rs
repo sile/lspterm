@@ -209,12 +209,13 @@ impl LspClient {
                 Err(v.invalid("unsupported JSON-RPC version"))
             }
         })?;
+        // TODO: {"jsonrpc":"2.0","id":0,"method":"window/workDoneProgress/create","params":{"token":"rustAnalyzer/Fetching"}}
         value.to_member("id")?.required()?.map(|v| {
             let id = v.as_integer_str()?;
             if id == request_id.to_string() {
                 Ok(())
             } else {
-                Err(v.invalid("expected ID {request_id} but got {id}"))
+                Err(v.invalid(format!("expected ID {request_id} but got {id}")))
             }
         })?;
 
@@ -230,7 +231,7 @@ impl LspClient {
 impl Drop for LspClient {
     fn drop(&mut self) {
         let _ = self.process.stdin.take();
-        for _ in 0..10 {
+        for _ in 0..100 {
             let Ok(status) = self.process.try_wait() else {
                 break;
             };
@@ -238,7 +239,7 @@ impl Drop for LspClient {
                 return;
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
         let _ = self.process.kill();
     }

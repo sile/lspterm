@@ -69,7 +69,7 @@ impl JsonRpcNotification for DidOpenNotification {
         f.member(
             "textDocument",
             json_object(|f| {
-                f.member("uri", format!("file:///{}", self.file.display()))?;
+                f.member("uri", format!("file://{}", self.file.display()))?;
                 f.member("languageId", "rust")?; // TODO
                 f.member("version", 1)?;
                 f.member("text", &self.content)
@@ -106,7 +106,7 @@ impl JsonRpcRequest for DefinitionRequest {
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
         f.member(
             "textDocument",
-            json_object(|f| f.member("uri", format!("file:///{}", self.file.display()))),
+            json_object(|f| f.member("uri", format!("file://{}", self.file.display()))),
         )?;
         f.member(
             "position",

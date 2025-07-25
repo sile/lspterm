@@ -78,6 +78,10 @@ impl JsonRpcRequest for InitializeRequest {
                     }),
                 )?;
                 f.member(
+                    "window",
+                    json_object(|f| f.member("workDoneProgress", true)),
+                )?;
+                f.member(
                     "general",
                     json_object(|f| f.member("positionEncodings", ["utf-8"])),
                 )
