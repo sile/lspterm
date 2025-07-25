@@ -1,9 +1,11 @@
 pub trait JsonRpcRequest {
-    type Response;
+    type Response: JsonRpcResponse;
 
     fn method(&self) -> &str;
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result;
 }
+
+pub trait JsonRpcResponse {}
 
 pub fn json_object<F>(members: F) -> impl nojson::DisplayJson
 where

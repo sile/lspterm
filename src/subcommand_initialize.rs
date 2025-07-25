@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use orfail::OrFail;
 
 use crate::{
-    json::{JsonRpcRequest, json_object},
+    json::{JsonRpcRequest, JsonRpcResponse, json_object},
     lsp_client::{LspClient, LspClientOptions},
 };
 
@@ -41,7 +41,7 @@ impl InitializeRequest {
 }
 
 impl JsonRpcRequest for InitializeRequest {
-    type Response = ();
+    type Response = InitializeResponse;
 
     fn method(&self) -> &str {
         "initialize"
@@ -74,3 +74,8 @@ impl JsonRpcRequest for InitializeRequest {
         Ok(())
     }
 }
+
+#[derive(Debug)]
+pub struct InitializeResponse {}
+
+impl JsonRpcResponse for InitializeResponse {}
