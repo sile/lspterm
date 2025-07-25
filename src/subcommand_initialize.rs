@@ -82,10 +82,6 @@ impl JsonRpcRequest for InitializeRequest {
                     json_object(|f| f.member("workDoneProgress", true)),
                 )?;
                 f.member(
-                    "workspace", // TODO
-                    json_object(|f| f.member("workspaceFolders", true)),
-                )?;
-                f.member(
                     "general",
                     json_object(|f| f.member("positionEncodings", ["utf-8"])),
                 )
