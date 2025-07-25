@@ -1,8 +1,8 @@
 use orfail::OrFail;
 
 use crate::{
+    json::InitializeRequest,
     lsp_client::{LspClient, LspServerSpec},
-    lsp_messages::InitializeRequest,
 };
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -23,7 +23,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         id: 0,
         workspace_folder: std::env::current_dir().or_fail()?,
     };
-    lsp_client.send(req).or_fail()?;
+    lsp_client.send_request(req).or_fail()?;
 
     Ok(None)
 }

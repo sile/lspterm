@@ -49,6 +49,7 @@ pub struct LspClient {
     process: Child,
     pub stdin: ChildStdin,
     pub stdout: Option<ChildStdout>,
+    next_request_id: u64,
 }
 
 impl LspClient {
@@ -72,10 +73,11 @@ impl LspClient {
             stdin,
             stdout: Some(stdout),
             process,
+            next_request_id: 0,
         })
     }
 
-    pub fn send<T>(&mut self, request: T) -> orfail::Result<()>
+    pub fn send_request<T>(&mut self, request: T) -> orfail::Result<()>
     where
         T: nojson::DisplayJson,
     {
@@ -84,6 +86,7 @@ impl LspClient {
         write!(self.stdin, "\r\n").or_fail()?;
         write!(self.stdin, "{content}").or_fail()?;
         self.stdin.flush().or_fail()?;
+        self.next_request_id += 1;
         Ok(())
     }
 
