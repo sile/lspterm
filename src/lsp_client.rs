@@ -130,7 +130,7 @@ impl LspClient {
             eprintln!("{content}");
         }
 
-        write!(self.stdin, "content-length: {}\r\n", content.len()).or_fail()?;
+        write!(self.stdin, "Content-Length: {}\r\n", content.len()).or_fail()?;
         write!(self.stdin, "\r\n").or_fail()?;
         write!(self.stdin, "{content}").or_fail()?;
         self.stdin.flush().or_fail()?;
@@ -153,7 +153,7 @@ impl LspClient {
             eprintln!("{content}");
         }
 
-        write!(self.stdin, "content-length: {}\r\n", content.len()).or_fail()?;
+        write!(self.stdin, "Content-Length: {}\r\n", content.len()).or_fail()?;
         write!(self.stdin, "\r\n").or_fail()?;
         write!(self.stdin, "{content}").or_fail()?;
         self.stdin.flush().or_fail()?;
@@ -175,7 +175,7 @@ impl LspClient {
             }
 
             let (k, v) = line.split_once(':').or_fail()?;
-            if k.eq_ignore_ascii_case("content-length") {
+            if k.eq_ignore_ascii_case("Content-Length") {
                 content_length = Some(v.trim().parse::<usize>().or_fail()?);
             }
         }
