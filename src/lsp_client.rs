@@ -1,4 +1,3 @@
-use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::{AsRawFd, RawFd};
 use std::path::PathBuf;
@@ -47,76 +46,25 @@ impl std::str::FromStr for LspServerSpec {
 }
 
 #[derive(Debug)]
-enum Logger {
-    Null,
-    File { messages: File, server_stderr: File },
-}
-
-impl Logger {
-    fn new(log_dir: Option<PathBuf>) -> orfail::Result<Self> {
-        let Some(log_dir) = log_dir else {
-            return Ok(Logger::Null);
-        };
-
-        std::fs::create_dir_all(&log_dir).or_fail_with(|e| {
-            format!(
-                "failed to create log directory '{}': {e}",
-                log_dir.display()
-            )
-        })?;
-
-        let messages = File::create(log_dir.join("messages.jsonl"))
-            .or_fail_with(|e| format!("failed to create messages log file: {e}"))?;
-
-        let server_stderr = File::create(log_dir.join("server_stderr.log"))
-            .or_fail_with(|e| format!("failed to create server stderr log file: {e}"))?;
-
-        Ok(Logger::File {
-            messages,
-            server_stderr,
-        })
-    }
-
-    fn log_message(&mut self, message: &str) -> orfail::Result<()> {
-        if let Logger::File { messages, .. } = self {
-            writeln!(messages, "{message}").or_fail()?;
-        }
-        Ok(())
-    }
-
-    fn log_server_stderr(&mut self, line: &str) -> orfail::Result<()> {
-        if let Logger::File { server_stderr, .. } = self {
-            writeln!(server_stderr, "{line}").or_fail()?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
 pub struct LspClient {
     process: Child,
     pub stdin: ChildStdin,
     pub stdout: Option<ChildStdout>,
     stderr: Option<BufReader<ChildStderr>>,
-    logger: Logger,
 }
 
 impl LspClient {
-    pub fn new(
-        lsp_server_command: PathBuf,
-        lsp_server_args: Vec<String>,
-        log_dir: Option<PathBuf>,
-    ) -> orfail::Result<Self> {
-        let mut command = Command::new(&lsp_server_command);
+    pub fn new(lsp_server_spec: LspServerSpec) -> orfail::Result<Self> {
+        let mut command = Command::new(&lsp_server_spec.command);
         command
-            .args(&lsp_server_args)
+            .args(&lsp_server_spec.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let mut process = command.spawn().or_fail_with(|e| {
             format!(
                 "failed to spawn LSP server process '{}': {e}",
-                lsp_server_command.display()
+                lsp_server_spec.command.display()
             )
         })?;
 
@@ -134,7 +82,6 @@ impl LspClient {
             stdout: Some(stdout),
             stderr: Some(BufReader::new(stderr)),
             process,
-            logger: Logger::new(log_dir).or_fail()?,
         })
     }
 
@@ -143,7 +90,6 @@ impl LspClient {
         T: nojson::DisplayJson,
     {
         let content = nojson::Json(request).to_string();
-        self.logger.log_message(&content).or_fail()?;
         write!(self.stdin, "Content-length: {}\r\n", content.len()).or_fail()?;
         write!(self.stdin, "\r\n").or_fail()?;
         write!(self.stdin, "{content}").or_fail()?;
@@ -182,7 +128,6 @@ impl LspClient {
             }
             Ok(Some(_)) => {
                 let line = line.trim_end().to_owned();
-                self.logger.log_server_stderr(&line).or_fail()?;
                 Ok(Some(line))
             }
             Ok(None) => Ok(None),
