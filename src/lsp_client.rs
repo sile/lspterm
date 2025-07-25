@@ -178,8 +178,21 @@ impl LspClient {
                 Err(v.invalid("unsupported JSON-RPC version"))
             }
         })?;
+        value.to_member("id")?.required()?.map(|v| {
+            let id = v.as_integer_str()?;
+            if id == request_id.to_string() {
+                Ok(())
+            } else {
+                Err(v.invalid("expected ID {request_id} but got {id}"))
+            }
+        })?;
 
-        todo!()
+        if let Some(e) = value.to_member("error")?.get() {
+            return Err(e.invalid("unexpected error response"));
+        }
+
+        let result = value.to_member("result")?.required()?;
+        T::from_result_value(result)
     }
 }
 
