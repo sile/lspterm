@@ -4,7 +4,7 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use orfail::OrFail;
 
-use crate::json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, json_object};
+use crate::json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonValue, json_object};
 
 #[derive(Debug)]
 pub struct LspServerSpec {
@@ -161,36 +161,96 @@ impl LspClient {
         Ok(())
     }
 
-    fn recv_response<T>(&mut self, request_id: u64) -> orfail::Result<T>
+    fn send_response<T>(&mut self, request_id: &JsonValue, result: T) -> orfail::Result<()>
     where
-        T: JsonRpcResponse,
+        T: nojson::DisplayJson,
     {
-        let mut content_length = None;
-        loop {
-            let mut line = String::new();
-            let size = self.stdout.read_line(&mut line).or_fail()?;
-            (size > 0).or_fail()?;
-            if line == "\r\n" {
-                break;
-            }
+        let content = nojson::Json(json_object(|f| {
+            f.member("jsonrpc", "2.0")?;
+            f.member("id", request_id)?;
+            f.member("result", &result)
+        }))
+        .to_string();
 
-            let (k, v) = line.split_once(':').or_fail()?;
-            if k.eq_ignore_ascii_case("Content-Length") {
-                content_length = Some(v.trim().parse::<usize>().or_fail()?);
-            }
-        }
-
-        let content_length = content_length.or_fail()?;
-        let mut content = vec![0; content_length];
-        self.stdout.read_exact(&mut content).or_fail()?;
-
-        let content = String::from_utf8(content).or_fail()?;
         if self.options.verbose {
             eprintln!("{content}");
         }
 
-        let json = nojson::RawJson::parse(&content).or_fail()?;
-        self.parse_response(request_id, json.value()).or_fail()
+        write!(self.stdin, "Content-Length: {}\r\n", content.len()).or_fail()?;
+        write!(self.stdin, "\r\n").or_fail()?;
+        write!(self.stdin, "{content}").or_fail()?;
+        self.stdin.flush().or_fail()?;
+
+        Ok(())
+    }
+
+    fn recv_response<T>(&mut self, request_id: u64) -> orfail::Result<T>
+    where
+        T: JsonRpcResponse,
+    {
+        loop {
+            let mut content_length = None;
+            loop {
+                let mut line = String::new();
+                let size = self.stdout.read_line(&mut line).or_fail()?;
+                (size > 0).or_fail()?;
+                if line == "\r\n" {
+                    break;
+                }
+
+                let (k, v) = line.split_once(':').or_fail()?;
+                if k.eq_ignore_ascii_case("Content-Length") {
+                    content_length = Some(v.trim().parse::<usize>().or_fail()?);
+                }
+            }
+
+            let content_length = content_length.or_fail()?;
+            let mut content = vec![0; content_length];
+            self.stdout.read_exact(&mut content).or_fail()?;
+
+            let content = String::from_utf8(content).or_fail()?;
+            if self.options.verbose {
+                eprintln!("{content}");
+            }
+
+            let json = nojson::RawJson::parse(&content).or_fail()?;
+            if self
+                .handle_work_done_progress_if_need(json.value())
+                .or_fail()?
+            {
+                continue;
+            }
+
+            return self.parse_response(request_id, json.value()).or_fail();
+        }
+    }
+
+    fn handle_work_done_progress_if_need(
+        &mut self,
+        value: nojson::RawJsonValue<'_, '_>,
+    ) -> Result<bool, nojson::JsonParseError> {
+        self.check_jsonrpc_version(value)?;
+
+        let Some(method) = value.to_member("method")?.get() else {
+            return Ok(false);
+        };
+
+        match method.to_unquoted_string_str()?.as_ref() {
+            "window/workDoneProgress/create" => {
+                let request_id: JsonValue = value.to_member("id")?.required()?.try_into()?;
+
+                // TODO: {"token":"rustAnalyzer/Fetching"}
+                let _params = value.to_member("params")?.required()?;
+                let _ = self.send_response(&request_id, ()); // TODO: error handling
+                Ok(true)
+            }
+            "$/progress" => {
+                // TODO: {"token":"rustAnalyzer/Fetching","value":{"kind":"begin","title":"Fetching","cancellable":false}}
+                let _params = value.to_member("params")?.required()?;
+                Ok(true)
+            }
+            _ => Err(method.invalid("unexpected server-side request")),
+        }
     }
 
     fn parse_response<T>(
@@ -201,15 +261,7 @@ impl LspClient {
     where
         T: JsonRpcResponse,
     {
-        value.to_member("jsonrpc")?.required()?.map(|v| {
-            let version = v.to_unquoted_string_str()?;
-            if version == "2.0" {
-                Ok(())
-            } else {
-                Err(v.invalid("unsupported JSON-RPC version"))
-            }
-        })?;
-        // TODO: {"jsonrpc":"2.0","id":0,"method":"window/workDoneProgress/create","params":{"token":"rustAnalyzer/Fetching"}}
+        self.check_jsonrpc_version(value)?;
         value.to_member("id")?.required()?.map(|v| {
             let id = v.as_integer_str()?;
             if id == request_id.to_string() {
@@ -225,6 +277,21 @@ impl LspClient {
 
         let result = value.to_member("result")?.required()?;
         T::from_result_value(result)
+    }
+
+    fn check_jsonrpc_version(
+        &self,
+        value: nojson::RawJsonValue<'_, '_>,
+    ) -> Result<(), nojson::JsonParseError> {
+        value.to_member("jsonrpc")?.required()?.map(|v| {
+            let version = v.to_unquoted_string_str()?;
+            if version == "2.0" {
+                Ok(())
+            } else {
+                Err(v.invalid("unsupported JSON-RPC version"))
+            }
+        })?;
+        Ok(())
     }
 }
 

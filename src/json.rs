@@ -37,7 +37,7 @@ where
     nojson::json(move |f| f.object(|f| members(f)))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum JsonValue {
     Null,
     Boolean(bool),
