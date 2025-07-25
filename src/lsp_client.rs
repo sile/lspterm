@@ -4,7 +4,7 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use orfail::OrFail;
 
-use crate::json::{JsonRpcRequest, JsonRpcResponse, json_object};
+use crate::json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, json_object};
 
 #[derive(Debug)]
 pub struct LspServerSpec {
@@ -104,6 +104,14 @@ impl LspClient {
         self.recv_response(id).or_fail()
     }
 
+    pub fn cast<T>(&mut self, notification: T) -> orfail::Result<()>
+    where
+        T: JsonRpcNotification,
+    {
+        self.send_notification(notification).or_fail()?;
+        Ok(())
+    }
+
     fn send_request<T>(&mut self, request: T) -> orfail::Result<u64>
     where
         T: JsonRpcRequest,
@@ -128,6 +136,29 @@ impl LspClient {
         self.stdin.flush().or_fail()?;
 
         Ok(id)
+    }
+
+    fn send_notification<T>(&mut self, request: T) -> orfail::Result<()>
+    where
+        T: JsonRpcNotification,
+    {
+        let content = nojson::Json(json_object(|f| {
+            f.member("jsonrpc", "2.0")?;
+            f.member("method", request.method())?;
+            f.member("params", json_object(|f| request.params(f)))
+        }))
+        .to_string();
+
+        if self.options.verbose {
+            eprintln!("{content}");
+        }
+
+        write!(self.stdin, "content-length: {}\r\n", content.len()).or_fail()?;
+        write!(self.stdin, "\r\n").or_fail()?;
+        write!(self.stdin, "{content}").or_fail()?;
+        self.stdin.flush().or_fail()?;
+
+        Ok(())
     }
 
     fn recv_response<T>(&mut self, request_id: u64) -> orfail::Result<T>

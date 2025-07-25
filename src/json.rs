@@ -9,6 +9,21 @@ pub trait JsonRpcRequest {
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result;
 }
 
+pub trait JsonRpcNotification {
+    fn method(&self) -> &str;
+    fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result;
+}
+
+impl JsonRpcNotification for &str {
+    fn method(&self) -> &str {
+        self
+    }
+
+    fn params(&self, _f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
 pub trait JsonRpcResponse: Sized {
     fn from_result_value(
         value: nojson::RawJsonValue<'_, '_>,

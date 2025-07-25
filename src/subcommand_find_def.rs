@@ -5,6 +5,7 @@ use orfail::OrFail;
 use crate::{
     json::{JsonRpcRequest, JsonRpcResponse, JsonValue, json_object},
     lsp_client::{LspClient, LspClientOptions},
+    subcommand_initialize::initialize,
 };
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -29,6 +30,8 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     }
 
     let mut lsp_client = LspClient::new(options).or_fail()?;
+    initialize(&mut lsp_client).or_fail()?;
+    // TODO: capability check
 
     let req = DefinitionRequest::new(file, line, character).or_fail()?;
     let res = lsp_client.call(req).or_fail()?;

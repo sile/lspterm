@@ -20,12 +20,17 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     }
 
     let mut lsp_client = LspClient::new(options).or_fail()?;
-
-    let req = InitializeRequest::new().or_fail()?;
-    let res = lsp_client.call(req).or_fail()?;
+    let res = initialize(&mut lsp_client).or_fail()?;
     println!("{}", nojson::Json(res.value));
 
     Ok(None)
+}
+
+pub fn initialize(client: &mut LspClient) -> orfail::Result<InitializeResponse> {
+    let req = InitializeRequest::new().or_fail()?;
+    let res = client.call(req).or_fail()?;
+    client.cast("initialized").or_fail()?;
+    Ok(res)
 }
 
 #[derive(Debug)]
