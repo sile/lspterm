@@ -36,9 +36,14 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let did_open = DidOpenNotification::new(&file).or_fail()?;
     lsp_client.cast(did_open).or_fail()?;
 
-    let req = DefinitionRequest::new(file, line, character).or_fail()?;
-    let res = lsp_client.call(req).or_fail()?;
-    println!("{}", nojson::Json(res.value));
+    for i in 0..10 {
+        let req = DefinitionRequest::new(file.clone(), line, character).or_fail()?;
+        let Ok(res) = lsp_client.call(req).or_fail() else {
+            continue; // TODO
+        };
+        println!("[{i}] {}", nojson::Json(res.value));
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 
     Ok(None)
 }

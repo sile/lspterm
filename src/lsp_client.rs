@@ -249,6 +249,10 @@ impl LspClient {
                 let _params = value.to_member("params")?.required()?;
                 Ok(true)
             }
+            "textDocument/publishDiagnostics" => {
+                // TODO: disable the capability?
+                Ok(true)
+            }
             _ => Err(method.invalid("unexpected server-side request")),
         }
     }
