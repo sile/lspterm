@@ -9,6 +9,9 @@ fn main() -> noargs::Result<()> {
     }
     noargs::HELP_FLAG.take_help(&mut args);
 
+    let Some(args) = lspterm::subcommand_serve::try_run(args)? else {
+        return Ok(());
+    };
     let Some(args) = lspterm::subcommand_initialize::try_run(args)? else {
         return Ok(());
     };
