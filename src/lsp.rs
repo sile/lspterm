@@ -6,7 +6,7 @@ use crate::json::json_object;
 
 pub fn send_request<W, T>(
     mut writer: W,
-    request_id: u64,
+    request_id: u32,
     method: &str,
     params: T,
 ) -> orfail::Result<String>
@@ -50,7 +50,7 @@ where
     Ok(content)
 }
 
-pub fn recv_ok_response<R, T>(mut reader: R, request_id: u64) -> orfail::Result<(T, String)>
+pub fn recv_ok_response<R, T>(mut reader: R, request_id: u32) -> orfail::Result<(T, String)>
 where
     R: BufRead,
     T: for<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>, Error = nojson::JsonParseError>,
@@ -86,7 +86,7 @@ where
         }
 
         let id = value.to_member("id")?.required()?;
-        if u64::try_from(id)? != request_id {
+        if u32::try_from(id)? != request_id {
             return Err(id.invalid(format!("expected ID {request_id}, but got {id}")));
         }
 

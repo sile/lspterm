@@ -11,6 +11,9 @@ use crate::{
     lsp,
 };
 
+const INITIALIZE_REQUEST_ID: u32 = 1;
+const SHUTDOWN_REQUEST_ID: u32 = 0;
+
 #[derive(Debug, Default, Clone)]
 struct Args {
     port: u16,
@@ -51,7 +54,8 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     let mut lsp_server_stdin = lsp_server.stdin.take().or_fail()?;
     let mut lsp_server_stdout = BufReader::new(lsp_server.stdout.take().or_fail()?);
     initialize_lsp_server(&mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
-
+    shutdown_lsp_server(&mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
+    lsp_server.wait().or_fail()?;
     Ok(None)
 }
 
@@ -104,13 +108,38 @@ where
         f.member("capabilities", json_object(capabilities))?;
         Ok(())
     });
-    let json = lsp::send_request(&mut writer, 0, "initialize", initialize_params).or_fail()?;
+    let json = lsp::send_request(
+        &mut writer,
+        INITIALIZE_REQUEST_ID,
+        "initialize",
+        initialize_params,
+    )
+    .or_fail()?;
     println!("{json}");
 
-    let (_, json): (JsonValue, _) = lsp::recv_ok_response(&mut reader, 0).or_fail()?;
+    let (_, json): (JsonValue, _) =
+        lsp::recv_ok_response(&mut reader, INITIALIZE_REQUEST_ID).or_fail()?;
     println!("{json}");
 
     let json = lsp::send_notification(&mut writer, "initialized", ()).or_fail()?;
+    println!("{json}");
+
+    Ok(())
+}
+
+fn shutdown_lsp_server<R, W>(mut reader: R, mut writer: W) -> orfail::Result<()>
+where
+    R: BufRead,
+    W: Write,
+{
+    let json = lsp::send_request(&mut writer, SHUTDOWN_REQUEST_ID, "shutdown", ()).or_fail()?;
+    println!("{json}");
+
+    let (_, json): (JsonValue, _) =
+        lsp::recv_ok_response(&mut reader, SHUTDOWN_REQUEST_ID).or_fail()?;
+    println!("{json}");
+
+    let json = lsp::send_notification(&mut writer, "exit", ()).or_fail()?;
     println!("{json}");
 
     Ok(())
