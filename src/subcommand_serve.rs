@@ -7,7 +7,7 @@ use std::{
 use orfail::OrFail;
 
 use crate::{
-    json::{JsonRpcResponse, JsonValue, json_object},
+    json::{JsonValue, json_object},
     lsp,
 };
 
@@ -107,24 +107,11 @@ where
     let json = lsp::send_request(&mut writer, 0, "initialize", initialize_params).or_fail()?;
     println!("{json}");
 
-    // TODO:
+    let (_, json): (JsonValue, _) = lsp::recv_ok_response(&mut reader, 0).or_fail()?;
+    println!("{json}");
+
     let json = lsp::send_notification(&mut writer, "initialized", ()).or_fail()?;
     println!("{json}");
 
     Ok(())
-}
-
-#[derive(Debug)]
-pub struct InitializeResponse {
-    value: JsonValue,
-}
-
-impl JsonRpcResponse for InitializeResponse {
-    fn from_result_value(
-        value: nojson::RawJsonValue<'_, '_>,
-    ) -> Result<Self, nojson::JsonParseError> {
-        Ok(Self {
-            value: value.try_into()?,
-        })
-    }
 }
