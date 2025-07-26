@@ -51,10 +51,9 @@ where
     Ok(content)
 }
 
-pub fn recv_ok_response<R, T>(mut reader: R, request_id: u32) -> orfail::Result<(T, String)>
+pub fn recv_json<R>(mut reader: R) -> orfail::Result<nojson::RawJsonOwned>
 where
     R: BufRead,
-    T: for<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>, Error = nojson::JsonParseError>,
 {
     let mut content_length = None;
     loop {
@@ -77,7 +76,16 @@ where
 
     let content = String::from_utf8(content).or_fail()?;
 
-    let json = nojson::RawJson::parse(&content).or_fail()?;
+    let json = nojson::RawJsonOwned::parse(&content).or_fail()?;
+    Ok(json)
+}
+
+pub fn recv_ok_response<R, T>(mut reader: R, request_id: u32) -> orfail::Result<(T, String)>
+where
+    R: BufRead,
+    T: for<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>, Error = nojson::JsonParseError>,
+{
+    let json = recv_json(reader).or_fail()?;
     let value = json.value();
     let parse = || -> Result<T, nojson::JsonParseError> {
         check_jsonrpc_version(value)?;
@@ -100,7 +108,7 @@ where
     };
     check_jsonrpc_version(value).or_fail()?;
 
-    parse().map(|v| (v, content)).or_fail()
+    parse().map(|v| (v, json.to_string())).or_fail()
 }
 
 fn check_jsonrpc_version(

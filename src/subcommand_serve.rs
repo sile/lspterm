@@ -59,12 +59,13 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
 
     let _listener = TcpListener::bind(("127.0.0.1", args.port)).or_fail()?;
 
-    let (lsp_server_req_tx, lsp_server_req_rx) = std::sync::mpsc::channel();
+    let (lsp_server_msg_tx, lsp_server_msg_rx) = std::sync::mpsc::channel();
     let lsp_server_thread_handle = std::thread::spawn(move || {
         if let Err(e) = run_lsp_server(
             &mut lsp_server_stdin,
             &mut lsp_server_stdout,
-            lsp_server_req_rx,
+            lsp_server_msg_tx,
+            lsp_server_msg_rx,
         )
         .or_fail()
         {
@@ -83,12 +84,39 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     Ok(None)
 }
 
+#[derive(Debug)]
+enum Message {
+    Request,
+    Notification,
+    Response { json: nojson::RawJsonOwned },
+    Error,
+}
+
 fn run_lsp_server(
     stdin: &mut ChildStdin,
     stdout: &mut BufReader<ChildStdout>,
-    req_rx: std::sync::mpsc::Receiver<()>,
+    msg_tx: std::sync::mpsc::Sender<Message>,
+    msg_rx: std::sync::mpsc::Receiver<Message>,
 ) -> orfail::Result<()> {
+    std::thread::scope(|s| {
+        s.spawn(|| run_lsp_server_stdout_loop(stdout, msg_tx));
+        s.spawn(move || {
+            loop {
+                let _ = msg_rx.recv();
+            }
+        });
+    });
     Ok(())
+}
+
+fn run_lsp_server_stdout_loop(
+    stdout: &mut BufReader<ChildStdout>,
+    msg_tx: std::sync::mpsc::Sender<Message>,
+) {
+    loop {
+        let mut line = String::new();
+        let _ = stdout.read_line(&mut line);
+    }
 }
 
 fn spawn_lsp_server(args: &Args) -> orfail::Result<Child> {
