@@ -2,7 +2,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::TcpListener,
     path::PathBuf,
-    process::{Child, Command, Stdio},
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
 };
 
 use orfail::OrFail;
@@ -33,6 +33,7 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     args.port = noargs::opt("port")
         .short('p')
         .default("9257")
+        .env("LSPTERM_PORT")
         .take(&mut raw_args)
         .then(|a| a.value().parse())?;
     args.lsp_server_command = noargs::arg("LSP_SERVER_COMMAND")
@@ -57,8 +58,18 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     initialize_lsp_server(&mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
 
     let _listener = TcpListener::bind(("127.0.0.1", args.port)).or_fail()?;
+
+    let (lsp_server_req_tx, lsp_server_req_rx) = std::sync::mpsc::channel();
     let lsp_server_thread_handle = std::thread::spawn(move || {
-        //
+        if let Err(e) = run_lsp_server(
+            &mut lsp_server_stdin,
+            &mut lsp_server_stdout,
+            lsp_server_req_rx,
+        )
+        .or_fail()
+        {
+            eprintln!("failed to run lsp server: {e}");
+        }
         (lsp_server_stdin, lsp_server_stdout)
     });
     lsp_server_thread_handle.is_finished();
@@ -70,6 +81,14 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     lsp_server.wait().or_fail()?;
 
     Ok(None)
+}
+
+fn run_lsp_server(
+    stdin: &mut ChildStdin,
+    stdout: &mut BufReader<ChildStdout>,
+    req_rx: std::sync::mpsc::Receiver<()>,
+) -> orfail::Result<()> {
+    Ok(())
 }
 
 fn spawn_lsp_server(args: &Args) -> orfail::Result<Child> {
