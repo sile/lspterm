@@ -33,6 +33,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     initialize(&mut lsp_client).or_fail()?;
     // TODO: capability check
 
+    let file = file.canonicalize().or_fail()?;
     let did_open = DidOpenNotification::new(&file).or_fail()?;
     lsp_client.cast(did_open).or_fail()?;
 
