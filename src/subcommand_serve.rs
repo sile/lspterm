@@ -8,7 +8,7 @@ use orfail::OrFail;
 
 use crate::{
     json::{JsonValue, json_object},
-    lsp,
+    lsp::{self, DocumentUri},
 };
 
 const INITIALIZE_REQUEST_ID: u32 = 1;
@@ -79,13 +79,13 @@ where
     R: BufRead,
     W: Write,
 {
-    let workspace_folder_path = std::env::current_dir().or_fail()?;
+    let workspace_folder_uri = DocumentUri::new(std::env::current_dir().or_fail()?).or_fail()?;
     let client_info = |f: &mut nojson::JsonObjectFormatter<'_, '_, '_>| {
         f.member("name", env!("CARGO_PKG_NAME"))?;
         f.member("version", env!("CARGO_PKG_VERSION"))
     };
     let workspace_folder = |f: &mut nojson::JsonObjectFormatter<'_, '_, '_>| {
-        f.member("uri", format!("file://{}", workspace_folder_path.display()))?;
+        f.member("uri", &workspace_folder_uri)?;
         f.member("name", "main")
     };
     let capabilities = |f: &mut nojson::JsonObjectFormatter<'_, '_, '_>| {

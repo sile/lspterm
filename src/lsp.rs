@@ -1,4 +1,7 @@
-use std::io::{BufRead, Write};
+use std::{
+    io::{BufRead, Write},
+    path::{Path, PathBuf},
+};
 
 use orfail::OrFail;
 
@@ -114,4 +117,20 @@ fn check_jsonrpc_version(
         }
     })?;
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct DocumentUri(PathBuf);
+
+impl DocumentUri {
+    pub fn new<P: AsRef<Path>>(path: P) -> orfail::Result<Self> {
+        let path = path.as_ref().canonicalize().or_fail()?;
+        Ok(Self(path))
+    }
+}
+
+impl nojson::DisplayJson for DocumentUri {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        f.string(format!("file://{}", self.0.display()))
+    }
 }
