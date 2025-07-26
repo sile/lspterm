@@ -1,5 +1,6 @@
 use std::{
     io::{BufRead, BufReader, Write},
+    net::TcpListener,
     path::PathBuf,
     process::{Child, Command, Stdio},
 };
@@ -54,8 +55,20 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     let mut lsp_server_stdin = lsp_server.stdin.take().or_fail()?;
     let mut lsp_server_stdout = BufReader::new(lsp_server.stdout.take().or_fail()?);
     initialize_lsp_server(&mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
-    shutdown_lsp_server(&mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
+
+    let _listener = TcpListener::bind(("127.0.0.1", args.port)).or_fail()?;
+    let lsp_server_thread_handle = std::thread::spawn(move || {
+        //
+        (lsp_server_stdin, lsp_server_stdout)
+    });
+    lsp_server_thread_handle.is_finished();
+
+    let (lsp_server_stdin, lsp_server_stdout) = lsp_server_thread_handle
+        .join()
+        .unwrap_or_else(|e| std::panic::resume_unwind(e));
+    shutdown_lsp_server(lsp_server_stdout, lsp_server_stdin).or_fail()?;
     lsp_server.wait().or_fail()?;
+
     Ok(None)
 }
 
