@@ -5,8 +5,6 @@ use std::{
 
 use orfail::OrFail;
 
-use crate::json::json_object;
-
 pub fn send_request<W, T>(
     mut writer: W,
     request_id: u32,
@@ -17,12 +15,12 @@ where
     W: Write,
     T: nojson::DisplayJson,
 {
-    let content = nojson::Json(json_object(|f| {
+    let content = nojson::object(|f| {
         f.member("jsonrpc", "2.0")?;
         f.member("id", request_id)?;
         f.member("method", method)?;
         f.member("params", &params)
-    }))
+    })
     .to_string();
 
     write!(writer, "Content-Length: {}\r\n", content.len()).or_fail()?;
@@ -38,11 +36,11 @@ where
     W: Write,
     T: nojson::DisplayJson,
 {
-    let content = nojson::Json(json_object(|f| {
+    let content = nojson::object(|f| {
         f.member("jsonrpc", "2.0")?;
         f.member("method", method)?;
         f.member("params", &params)
-    }))
+    })
     .to_string();
 
     write!(writer, "Content-Length: {}\r\n", content.len()).or_fail()?;

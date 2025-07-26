@@ -8,7 +8,7 @@ use std::{
 use orfail::OrFail;
 
 use crate::{
-    json::{JsonValue, json_object},
+    json::JsonValue,
     lsp::{self, DocumentUri},
 };
 
@@ -123,21 +123,26 @@ where
     let capabilities = |f: &mut nojson::JsonObjectFormatter<'_, '_, '_>| {
         f.member(
             "textDocument",
-            json_object(|f| f.member("definition", json_object(|f| f.member("linkSupport", true)))),
+            nojson::object(|f| {
+                f.member(
+                    "definition",
+                    nojson::object(|f| f.member("linkSupport", true)),
+                )
+            }),
         )?;
         f.member(
             "window",
-            json_object(|f| f.member("workDoneProgress", true)),
+            nojson::object(|f| f.member("workDoneProgress", true)),
         )?;
         f.member(
             "general",
-            json_object(|f| f.member("positionEncodings", ["utf-8"])),
+            nojson::object(|f| f.member("positionEncodings", ["utf-8"])),
         )
     };
-    let initialize_params = json_object(|f| {
-        f.member("clientInfo", json_object(client_info))?;
-        f.member("workspaceFolders", [json_object(workspace_folder)])?;
-        f.member("capabilities", json_object(capabilities))?;
+    let initialize_params = nojson::object(|f| {
+        f.member("clientInfo", nojson::object(client_info))?;
+        f.member("workspaceFolders", [nojson::object(workspace_folder)])?;
+        f.member("capabilities", nojson::object(capabilities))?;
         Ok(())
     });
     let json = lsp::send_request(

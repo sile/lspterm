@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use orfail::OrFail;
 
 use crate::{
-    json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonValue, json_object},
+    json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonValue},
     lsp_client::{LspClient, LspClientOptions},
     subcommand_initialize::initialize,
 };
@@ -74,7 +74,7 @@ impl JsonRpcNotification for DidOpenNotification {
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
         f.member(
             "textDocument",
-            json_object(|f| {
+            nojson::object(|f| {
                 f.member("uri", format!("file://{}", self.file.display()))?;
                 f.member("languageId", "rust")?; // TODO
                 f.member("version", 1)?;
@@ -112,11 +112,11 @@ impl JsonRpcRequest for DefinitionRequest {
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
         f.member(
             "textDocument",
-            json_object(|f| f.member("uri", format!("file://{}", self.file.display()))),
+            nojson::object(|f| f.member("uri", format!("file://{}", self.file.display()))),
         )?;
         f.member(
             "position",
-            json_object(|f| {
+            nojson::object(|f| {
                 f.member("line", self.line)?;
                 f.member("character", self.character)
             }),

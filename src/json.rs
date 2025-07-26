@@ -30,13 +30,6 @@ pub trait JsonRpcResponse: Sized {
     ) -> Result<Self, nojson::JsonParseError>;
 }
 
-pub fn json_object<F>(members: F) -> impl nojson::DisplayJson
-where
-    F: Fn(&mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result,
-{
-    nojson::json(move |f| f.object(|f| members(f)))
-}
-
 #[derive(Debug, Clone)]
 pub enum JsonValue {
     Null,

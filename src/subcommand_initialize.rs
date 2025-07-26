@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use orfail::OrFail;
 
 use crate::{
-    json::{JsonRpcRequest, JsonRpcResponse, JsonValue, json_object},
+    json::{JsonRpcRequest, JsonRpcResponse, JsonValue},
     lsp_client::{LspClient, LspClientOptions},
 };
 
@@ -56,34 +56,37 @@ impl JsonRpcRequest for InitializeRequest {
     fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
         f.member(
             "clientInfo",
-            json_object(|f| {
+            nojson::object(|f| {
                 f.member("name", env!("CARGO_PKG_NAME"))?;
                 f.member("version", env!("CARGO_PKG_VERSION"))
             }),
         )?;
         f.member(
             "workspaceFolders",
-            [json_object(|f| {
+            [nojson::object(|f| {
                 f.member("uri", format!("file://{}", self.workspace_folder.display()))?;
                 f.member("name", "main")
             })],
         )?;
         f.member(
             "capabilities",
-            json_object(|f| {
+            nojson::object(|f| {
                 f.member(
                     "textDocument",
-                    json_object(|f| {
-                        f.member("definition", json_object(|f| f.member("linkSupport", true)))
+                    nojson::object(|f| {
+                        f.member(
+                            "definition",
+                            nojson::object(|f| f.member("linkSupport", true)),
+                        )
                     }),
                 )?;
                 f.member(
                     "window",
-                    json_object(|f| f.member("workDoneProgress", true)),
+                    nojson::object(|f| f.member("workDoneProgress", true)),
                 )?;
                 f.member(
                     "general",
-                    json_object(|f| f.member("positionEncodings", ["utf-8"])),
+                    nojson::object(|f| f.member("positionEncodings", ["utf-8"])),
                 )
             }),
         )?;

@@ -4,7 +4,7 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use orfail::OrFail;
 
-use crate::json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonValue, json_object};
+use crate::json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonValue};
 
 #[derive(Debug)]
 pub struct LspServerSpec {
@@ -117,11 +117,11 @@ impl LspClient {
         T: JsonRpcRequest,
     {
         let id = self.next_request_id;
-        let content = nojson::Json(json_object(|f| {
+        let content = nojson::Json(nojson::object(|f| {
             f.member("jsonrpc", "2.0")?;
             f.member("id", id)?;
             f.member("method", request.method())?;
-            f.member("params", json_object(|f| request.params(f)))
+            f.member("params", nojson::object(|f| request.params(f)))
         }))
         .to_string();
         self.next_request_id += 1;
@@ -142,10 +142,10 @@ impl LspClient {
     where
         T: JsonRpcNotification,
     {
-        let content = nojson::Json(json_object(|f| {
+        let content = nojson::Json(nojson::object(|f| {
             f.member("jsonrpc", "2.0")?;
             f.member("method", request.method())?;
-            f.member("params", json_object(|f| request.params(f)))
+            f.member("params", nojson::object(|f| request.params(f)))
         }))
         .to_string();
 
@@ -165,7 +165,7 @@ impl LspClient {
     where
         T: nojson::DisplayJson,
     {
-        let content = nojson::Json(json_object(|f| {
+        let content = nojson::Json(nojson::object(|f| {
             f.member("jsonrpc", "2.0")?;
             f.member("id", request_id)?;
             f.member("result", &result)
