@@ -4,7 +4,6 @@ use std::{
     path::{Path, PathBuf},
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
     sync::mpsc::{Receiver, Sender},
-    thread::{self, JoinHandle},
 };
 
 use nojson::RawJsonOwned;
@@ -15,7 +14,7 @@ use crate::{
     lsp::{self, DocumentUri},
 };
 
-const INITIALIZE_REQUEST_ID: u32 = 1;
+const INITIALIZE_REQUEST_ID: u32 = 0;
 
 #[derive(Debug)]
 pub struct LspServerSpec {
@@ -80,8 +79,6 @@ pub enum LspMessage {
 pub struct LspServer {
     process: Child,
     message_tx: Sender<LspMessage>,
-    _stdin_thread: JoinHandle<()>,
-    _stdout_thread: JoinHandle<()>,
 }
 
 impl LspServer {
@@ -97,14 +94,14 @@ impl LspServer {
         let message_tx_for_stdout = message_tx.clone();
 
         // Spawn thread to handle stdin (sending messages to LSP server)
-        let stdin_thread = thread::spawn(move || {
+        std::thread::spawn(move || {
             if let Err(e) = Self::run_stdin_loop(stdin, message_rx) {
                 eprintln!("[ERROR] LSP server stdin thread error: {e}");
             }
         });
 
         // Spawn thread to handle stdout (receiving messages from LSP server)
-        let stdout_thread = thread::spawn(move || {
+        std::thread::spawn(move || {
             if let Err(e) = Self::run_stdout_loop(stdout, message_tx_for_stdout.clone()) {
                 eprintln!("[ERROR] LSP server stdout thread error: {e}");
                 let _ = message_tx_for_stdout.send(LspMessage::LspServerStdoutError);
@@ -114,8 +111,6 @@ impl LspServer {
         Ok(Self {
             process,
             message_tx,
-            _stdin_thread: stdin_thread,
-            _stdout_thread: stdout_thread,
         })
     }
 
@@ -174,7 +169,7 @@ impl LspServer {
         let workspace_folder_uri =
             DocumentUri::new(std::env::current_dir().or_fail()?).or_fail()?;
 
-        let initialize_params = nojson::object(|f| {
+        let params = nojson::object(|f| {
             f.member("clientInfo", Self::client_info())?;
             f.member(
                 "workspaceFolders",
@@ -189,14 +184,8 @@ impl LspServer {
             }
             Ok(())
         });
-
-        let json = lsp::send_request(
-            &mut writer,
-            INITIALIZE_REQUEST_ID,
-            "initialize",
-            initialize_params,
-        )
-        .or_fail()?;
+        let json = lsp::send_request(&mut writer, INITIALIZE_REQUEST_ID, "initialize", params)
+            .or_fail()?;
         println!("{json}");
 
         let json = lsp::recv_message(&mut reader).or_fail()?.or_fail()?;
