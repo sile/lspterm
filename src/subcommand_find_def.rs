@@ -1,4 +1,4 @@
-use std::{net::TcpStream, path::PathBuf};
+use std::{io::BufReader, net::TcpStream, path::PathBuf};
 
 use orfail::OrFail;
 
@@ -36,7 +36,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let file = DocumentUri::new(file).or_fail()?;
     let content = file.read_to_string().or_fail()?;
 
-    let mut stream = TcpStream::connect(("127.0.0.1", port)).or_fail()?;
+    let mut stream = BufReader::new(TcpStream::connect(("127.0.0.1", port)).or_fail()?);
 
     let params = nojson::object(|f| {
         f.member(
@@ -49,62 +49,45 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
             }),
         )
     });
-    lsp::send_notification(&mut stream, "textDocument/didOpen", params).or_fail()?;
+    lsp::send_notification(stream.get_mut(), "textDocument/didOpen", params).or_fail()?;
 
-    Ok(None)
-}
-
-#[derive(Debug)]
-pub struct DefinitionRequest {
-    pub file: PathBuf,
-    pub line: u32,
-    pub character: u32,
-}
-
-impl DefinitionRequest {
-    pub fn new(file: PathBuf, line: u32, character: u32) -> orfail::Result<Self> {
-        Ok(Self {
-            file,
-            line,
-            character,
-        })
-    }
-}
-
-impl JsonRpcRequest for DefinitionRequest {
-    type Response = DefinitionResponse;
-
-    fn method(&self) -> &str {
-        "textDocument/definition"
-    }
-
-    fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
-        f.member(
-            "textDocument",
-            nojson::object(|f| f.member("uri", format!("file://{}", self.file.display()))),
-        )?;
+    // Send definition request
+    let request_id = 1;
+    let params = nojson::object(|f| {
+        f.member("textDocument", nojson::object(|f| f.member("uri", &file)))?;
         f.member(
             "position",
             nojson::object(|f| {
-                f.member("line", self.line)?;
-                f.member("character", self.character)
+                f.member("line", line)?;
+                f.member("character", character)
             }),
-        )?;
-        Ok(())
-    }
-}
+        )
+    });
 
-#[derive(Debug)]
-pub struct DefinitionResponse {
-    value: JsonValue,
-}
+    lsp::send_request(
+        stream.get_mut(),
+        request_id,
+        "textDocument/definition",
+        params,
+    )
+    .or_fail()?;
 
-impl JsonRpcResponse for DefinitionResponse {
-    fn from_result_value(
-        value: nojson::RawJsonValue<'_, '_>,
-    ) -> Result<Self, nojson::JsonParseError> {
-        Ok(Self {
-            value: value.try_into()?,
-        })
+    // Receive definition response
+    let response_json = lsp::recv_message(&mut stream).or_fail()?;
+    let response_value = response_json.value();
+
+    // Check if there's an error in the response
+    if let Some(error) = response_value.to_member("error").or_fail()?.get() {
+        eprintln!("LSP server returned error: {}", error);
+        return Ok(None);
     }
+
+    // Parse and display the result
+    if let Some(result) = response_value.to_member("result").or_fail()?.get() {
+        println!("{}", result);
+    } else {
+        println!("No definition found");
+    }
+
+    Ok(None)
 }
