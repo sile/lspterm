@@ -15,6 +15,9 @@ fn main() -> noargs::Result<()> {
     let Some(args) = lspterm::subcommand_find_def::try_run(args)? else {
         return Ok(());
     };
+    let Some(args) = lspterm::subcommand_rename::try_run(args)? else {
+        return Ok(());
+    };
 
     if let Some(help) = args.finish()? {
         print!("{help}");
