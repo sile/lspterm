@@ -13,20 +13,36 @@ fn main() -> noargs::Result<()> {
         return Ok(());
     };
     let Some(args) = lspterm::subcommand_find_def::try_run(args)? else {
+        // textDocument/definition
         return Ok(());
     };
     let Some(args) = lspterm::subcommand_rename::try_run(args)? else {
+        // textDocument/rename
         return Ok(());
     };
     let Some(args) = lspterm::subcommand_completion::try_run(args)? else {
+        // textDocument/completion
         return Ok(());
     };
     let Some(args) = lspterm::subcommand_hover::try_run(args)? else {
+        // textDocument/hover
         return Ok(());
     };
     let Some(args) = lspterm::subcommand_act::try_run(args)? else {
+        // textDocument/codeAction
         return Ok(());
     };
+
+    // MEMO:
+    // - textDocument/references
+    // - textDocument/documentSymbol
+    // - textDocument/formatting
+    // - workspace/symbol
+    // - textDocument/implementation
+    // - textDocument/typeDefinition
+    // - textDocument/declaration
+    // - textDocument/documentHighlight
+    // - workspace/willRenameFiles
 
     if let Some(help) = args.finish()? {
         print!("{help}");
