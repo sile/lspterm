@@ -15,10 +15,10 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .env("LSPTERM_PORT")
         .take(&mut args)
         .then(|a| a.value().parse())?;
-    let context_only: Option<String> = noargs::opt("only")
-        .doc("Filter code actions by kind (e.g., 'quickfix', 'refactor')")
-        .take(&mut args)
-        .present_and_then(|a| a.value().parse())?;
+    // let context_only: Option<String> = noargs::opt("only")
+    //     .doc("Filter code actions by kind (e.g., 'quickfix', 'refactor')")
+    //     .take(&mut args)
+    //     .present_and_then(|a| a.value().parse())?;
     let file = noargs::arg("FILE")
         .example("/path/to/file")
         .take(&mut args)
@@ -72,9 +72,9 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
             "context",
             nojson::object(|f| {
                 f.member("diagnostics", nojson::array(|_| Ok(())))?;
-                if let Some(only_value) = &context_only {
-                    f.member("only", nojson::array(|f| f.element(only_value)))?;
-                }
+                // TODO: if let Some(only_value) = &context_only {
+                //f.member("only", ["quickfix", "refactor", "source"])?;
+                //}
                 Ok(())
             }),
         )
