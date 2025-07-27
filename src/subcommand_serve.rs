@@ -19,6 +19,7 @@ struct Args {
     port: u16,
     lsp_server_command: PathBuf,
     lsp_server_args: Vec<PathBuf>,
+    lsp_server_config: Option<RawJsonOwned>,
 }
 
 pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -35,6 +36,11 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
         .env("LSPTERM_PORT")
         .take(&mut raw_args)
         .then(|a| a.value().parse())?;
+    args.lsp_server_config = noargs::opt("lsp-server-config")
+        .short('c')
+        .env("LSP_SERVER_CONFIG")
+        .take(&mut raw_args)
+        .present_and_then(|a| RawJsonOwned::parse(a.value()))?;
     args.lsp_server_command = noargs::arg("LSP_SERVER_COMMAND")
         .example("/path/to/lsp-server")
         .take(&mut raw_args)
@@ -54,7 +60,7 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     let mut lsp_server = spawn_lsp_server(&args).or_fail()?;
     let mut lsp_server_stdin = lsp_server.stdin.take().or_fail()?;
     let mut lsp_server_stdout = BufReader::new(lsp_server.stdout.take().or_fail()?);
-    initialize_lsp_server(&mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
+    initialize_lsp_server(&args, &mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
 
     let _listener = TcpListener::bind(("127.0.0.1", args.port)).or_fail()?;
 
@@ -225,7 +231,7 @@ fn spawn_lsp_server(args: &Args) -> orfail::Result<Child> {
     })
 }
 
-fn initialize_lsp_server<R, W>(mut reader: R, mut writer: W) -> orfail::Result<()>
+fn initialize_lsp_server<R, W>(args: &Args, mut reader: R, mut writer: W) -> orfail::Result<()>
 where
     R: BufRead,
     W: Write,
@@ -262,6 +268,9 @@ where
         f.member("clientInfo", nojson::object(client_info))?;
         f.member("workspaceFolders", [nojson::object(workspace_folder)])?;
         f.member("capabilities", nojson::object(capabilities))?;
+        if let Some(config) = &args.lsp_server_config {
+            f.member("initializationOptions", config)?;
+        }
         Ok(())
     });
     let json = lsp::send_request(
