@@ -46,6 +46,8 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     }
 
     let lsp_server_spec = LspServerSpec::load(&lsp_server_config_file_path).or_fail()?;
+    let listener = TcpListener::bind(("127.0.0.1", port)).or_fail()?;
+
     let mut lsp_server = lsp_server_spec.spawn_process().or_fail()?;
     let mut lsp_server_stdin = lsp_server.stdin.take().or_fail()?;
     let mut lsp_server_stdout = BufReader::new(lsp_server.stdout.take().or_fail()?);
@@ -55,8 +57,6 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
         &mut lsp_server_stdin,
     )
     .or_fail()?;
-
-    let listener = TcpListener::bind(("127.0.0.1", port)).or_fail()?;
 
     let (lsp_server_msg_tx, lsp_server_msg_rx) = std::sync::mpsc::channel();
     let lsp_server_msg_tx_for_ls_server_thread = lsp_server_msg_tx.clone();
@@ -326,18 +326,14 @@ where
     let workspace_folder_uri = DocumentUri::new(std::env::current_dir().or_fail()?).or_fail()?;
 
     let initialize_params = nojson::object(|f| {
-        f.member("clientInfo", create_client_info())?;
+        f.member("clientInfo", client_info())?;
         f.member(
             "workspaceFolders",
-            [create_workspace_folder(&workspace_folder_uri)],
+            [workspace_folder(&workspace_folder_uri)],
         )?;
         f.member(
             "capabilities",
-            nojson::object(|f| {
-                f.member("textDocument", create_text_document_capabilities())?;
-                f.member("window", create_window_capabilities())?;
-                f.member("general", create_general_capabilities())
-            }),
+            nojson::RawJson::parse(include_str!("capabilities.json")).expect("bug"),
         )?;
         if let Some(options) = &spec.initialize_options {
             f.member("initializationOptions", options)?;
@@ -380,73 +376,14 @@ where
     Ok(())
 }
 
-fn create_text_document_capabilities() -> impl nojson::DisplayJson {
-    nojson::object(|f| {
-        f.member("definition", create_definition_capabilities())?;
-        f.member("codeAction", create_code_action_capabilities())
-    })
-}
-
-fn create_definition_capabilities() -> impl nojson::DisplayJson {
-    nojson::object(|f| f.member("linkSupport", true))
-}
-
-fn create_code_action_capabilities() -> impl nojson::DisplayJson {
-    nojson::object(|f| {
-        f.member("dynamicRegistration", false)?;
-        f.member(
-            "codeActionLiteralSupport",
-            create_code_action_literal_support(),
-        )?;
-        f.member("isPreferredSupport", true)?;
-        f.member("disabledSupport", true)?;
-        f.member("dataSupport", true)?;
-        f.member("resolveSupport", create_resolve_support())
-    })
-}
-
-fn create_code_action_literal_support() -> impl nojson::DisplayJson {
-    nojson::object(|f| f.member("codeActionKind", create_code_action_kind_support()))
-}
-
-fn create_code_action_kind_support() -> impl nojson::DisplayJson {
-    nojson::object(|f| {
-        f.member(
-            "valueSet",
-            [
-                "quickfix",
-                "refactor",
-                "refactor.extract",
-                "refactor.inline",
-                "refactor.rewrite",
-                "source",
-                "source.organizeImports",
-                "source.fixAll",
-            ],
-        )
-    })
-}
-
-fn create_resolve_support() -> impl nojson::DisplayJson {
-    nojson::object(|f| f.member("properties", ["edit"]))
-}
-
-fn create_window_capabilities() -> impl nojson::DisplayJson {
-    nojson::object(|f| f.member("workDoneProgress", true))
-}
-
-fn create_general_capabilities() -> impl nojson::DisplayJson {
-    nojson::object(|f| f.member("positionEncodings", ["utf-8"]))
-}
-
-fn create_client_info() -> impl nojson::DisplayJson {
+fn client_info() -> impl nojson::DisplayJson {
     nojson::object(|f| {
         f.member("name", env!("CARGO_PKG_NAME"))?;
         f.member("version", env!("CARGO_PKG_VERSION"))
     })
 }
 
-fn create_workspace_folder(workspace_folder_uri: &DocumentUri) -> impl nojson::DisplayJson + '_ {
+fn workspace_folder(workspace_folder_uri: &DocumentUri) -> impl nojson::DisplayJson + '_ {
     nojson::object(move |f| {
         f.member("uri", workspace_folder_uri)?;
         f.member("name", "main")

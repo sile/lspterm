@@ -1,0 +1,40 @@
+{
+  "textDocument": {
+    "definition": {
+      "linkSupport": true
+    },
+    "codeAction": {
+      "dynamicRegistration": false,
+      "codeActionLiteralSupport": {
+        "codeActionKind": {
+          "valueSet": [
+            "quickfix",
+            "refactor",
+            "refactor.extract",
+            "refactor.inline",
+            "refactor.rewrite",
+            "source",
+            "source.organizeImports",
+            "source.fixAll"
+          ]
+        }
+      },
+      "isPreferredSupport": true,
+      "disabledSupport": true,
+      "dataSupport": true,
+      "resolveSupport": {
+        "properties": [
+          "edit"
+        ]
+      }
+    }
+  },
+  "window": {
+    "workDoneProgress": true
+  },
+  "general": {
+    "positionEncodings": [
+      "utf-8"
+    ]
+  }
+}
