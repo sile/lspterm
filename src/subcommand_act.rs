@@ -5,7 +5,7 @@ use orfail::OrFail;
 use crate::lsp::{self, DocumentUri};
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
-    if !noargs::cmd("code-actions").take(&mut args).is_present() {
+    if !noargs::cmd("act").take(&mut args).is_present() {
         return Ok(Some(args));
     }
 
@@ -15,7 +15,12 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .env("LSPTERM_PORT")
         .take(&mut args)
         .then(|a| a.value().parse())?;
+    let context_only: Option<String> = noargs::opt("only")
+        .doc("Filter code actions by kind (e.g., 'quickfix', 'refactor')")
+        .take(&mut args)
+        .present_and_then(|a| a.value().parse())?;
     let file = noargs::arg("FILE")
+        .example("/path/to/file")
         .take(&mut args)
         .then(|a| a.value().parse::<PathBuf>())?;
     let start_line = noargs::arg("START_LINE")
@@ -30,10 +35,6 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let end_character = noargs::arg("END_CHARACTER")
         .take(&mut args)
         .then(|a| a.value().parse::<u32>())?;
-    let context_only: Option<String> = noargs::opt("only")
-        .doc("Filter code actions by kind (e.g., 'quickfix', 'refactor')")
-        .take(&mut args)
-        .present_and_then(|a| a.value().parse())?;
 
     if let Some(help) = args.finish()? {
         print!("{help}");
