@@ -11,6 +11,7 @@ use orfail::OrFail;
 
 use crate::{
     DEFAULT_PORT,
+    json::JsonObject,
     lsp::{self, DocumentUri},
 };
 
@@ -131,12 +132,12 @@ struct LspServerSpec {
 impl LspServerSpec {
     fn load(path: &Path) -> orfail::Result<Self> {
         crate::json::parse_file(path, |value| {
+            let object = JsonObject::new(value)?;
             Ok(Self {
-                command: value.to_member("command")?.required()?.try_into()?,
-                args: Option::try_from(value.to_member("args")?)?.unwrap_or_default(),
-                initialize_options: value
-                    .to_member("initializeOptions")?
-                    .get()
+                command: object.convert_required("command")?,
+                args: object.convert_optional_or_default("args")?,
+                initialize_options: object
+                    .get_optional("initialize_options")?
                     .map(|v| v.extract().into_owned()),
             })
         })
