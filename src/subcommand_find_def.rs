@@ -2,10 +2,7 @@ use std::{io::BufReader, net::TcpStream, path::PathBuf};
 
 use orfail::OrFail;
 
-use crate::{
-    json::{JsonRpcRequest, JsonRpcResponse, JsonValue},
-    lsp::{self, DocumentUri},
-};
+use crate::lsp::{self, DocumentUri};
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("find-def").take(&mut args).is_present() {
@@ -83,11 +80,12 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     }
 
     // Parse and display the result
-    if let Some(result) = response_value.to_member("result").or_fail()?.get() {
-        println!("{}", result);
-    } else {
-        println!("No definition found");
-    }
+    let result = response_value
+        .to_member("result")
+        .or_fail()?
+        .required()
+        .or_fail()?;
+    println!("{}", result);
 
     Ok(None)
 }

@@ -132,6 +132,7 @@ fn run_proxy_client(
 ) -> orfail::Result<()> {
     let mut stream = BufReader::new(stream);
     loop {
+        // TODO: handle eos
         let json = lsp::recv_message(&mut stream).or_fail()?;
         let value = json.value();
         let method = value
