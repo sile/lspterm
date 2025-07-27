@@ -5,6 +5,7 @@ use std::{
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
 };
 
+use nojson::RawJsonOwned;
 use orfail::OrFail;
 
 use crate::{
@@ -88,7 +89,14 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
 enum Message {
     Request,
     Notification,
-    Response { json: nojson::RawJsonOwned },
+    ResponseFromLspServer {
+        request_id: u32,
+        result: Result<RawJsonOwned, RawJsonOwned>,
+    },
+    ResponseToLspServer {
+        request_id: RawJsonOwned,
+        result: Result<RawJsonOwned, RawJsonOwned>,
+    },
     Error,
 }
 
@@ -99,7 +107,12 @@ fn run_lsp_server(
     msg_rx: std::sync::mpsc::Receiver<Message>,
 ) -> orfail::Result<()> {
     std::thread::scope(|s| {
-        s.spawn(|| run_lsp_server_stdout_loop(stdout, msg_tx));
+        s.spawn(|| {
+            if let Err(e) = run_lsp_server_stdout_loop(stdout, msg_tx.clone()).or_fail() {
+                eprintln!("[ERROR] failed to read LSP server stdout: {e}");
+                let _ = msg_tx.send(Message::Error);
+            }
+        });
         s.spawn(move || {
             loop {
                 let _ = msg_rx.recv();
@@ -112,18 +125,47 @@ fn run_lsp_server(
 fn run_lsp_server_stdout_loop(
     mut stdout: &mut BufReader<ChildStdout>,
     msg_tx: std::sync::mpsc::Sender<Message>,
-) {
+) -> orfail::Result<()> {
     loop {
-        let json = match lsp::recv_json(&mut stdout).or_fail() {
-            Err(e) => {
-                eprintln!("[ERROR] failed to read LSP server stdout: {e}");
-                let _ = msg_tx.send(Message::Error);
-                break;
-            }
-            Ok(json) => json,
-        };
+        let json = lsp::recv_json(&mut stdout).or_fail()?;
         println!("{json}");
+
+        let value = json.value();
+        let Some(request_id) = value.to_member("id").or_fail()?.get() else {
+            continue;
+        };
+
+        let res = if let Some(method) = value.to_member("method").or_fail()?.get() {
+            let request_id = request_id.extract().into_owned();
+            let method = method.to_unquoted_string_str().or_fail()?;
+            match method.as_ref() {
+                "window/workDoneProgress/create" => {
+                    let result = Ok(RawJsonOwned::parse("null").expect("bug"));
+                    Message::ResponseToLspServer { request_id, result }
+                }
+                _ => {
+                    let result = Err(RawJsonOwned::parse(
+                        r#"{"code":-32601, "message":"method not found"}"#,
+                    )
+                    .expect("bug"));
+                    Message::ResponseToLspServer { request_id, result }
+                }
+            }
+        } else {
+            let request_id = u32::try_from(request_id).or_fail()?;
+            let result = if let Some(e) = value.to_member("error").or_fail()?.get() {
+                Err(e.extract().into_owned())
+            } else {
+                let result = value.to_member("result").or_fail()?.required().or_fail()?;
+                Ok(result.extract().into_owned())
+            };
+            Message::ResponseFromLspServer { request_id, result }
+        };
+        if msg_tx.send(res).is_err() {
+            break;
+        }
     }
+    Ok(())
 }
 
 fn spawn_lsp_server(args: &Args) -> orfail::Result<Child> {
