@@ -2,8 +2,8 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    path::{Path, PathBuf},
-    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    path::PathBuf,
+    process::{ChildStdin, ChildStdout},
 };
 
 use nojson::RawJsonOwned;
@@ -11,8 +11,8 @@ use orfail::OrFail;
 
 use crate::{
     DEFAULT_PORT,
-    json::JsonObject,
     lsp::{self, DocumentUri},
+    lsp_server::LspServerSpec,
 };
 
 const INITIALIZE_REQUEST_ID: u32 = 1;
@@ -120,44 +120,6 @@ enum Message {
         result: Result<RawJsonOwned, RawJsonOwned>,
     },
     LspServerStdoutError,
-}
-
-#[derive(Debug)]
-struct LspServerSpec {
-    command: PathBuf,
-    args: Vec<String>,
-    initialize_options: Option<RawJsonOwned>,
-}
-
-impl LspServerSpec {
-    fn load(path: &Path) -> orfail::Result<Self> {
-        crate::json::parse_file(path, |value| {
-            let object = JsonObject::new(value)?;
-            Ok(Self {
-                command: object.convert_required("command")?,
-                args: object.convert_optional_or_default("args")?,
-                initialize_options: object
-                    .get_optional("initialize_options")?
-                    .map(|v| v.extract().into_owned()),
-            })
-        })
-        .or_fail()
-    }
-
-    fn spawn_process(&self) -> orfail::Result<Child> {
-        Command::new(&self.command)
-            .args(&self.args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .or_fail_with(|e| {
-                format!(
-                    "failed to spawn LSP server process '{}': {e}",
-                    self.command.display()
-                )
-            })
-    }
 }
 
 fn run_proxy_client(

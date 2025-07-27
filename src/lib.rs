@@ -1,5 +1,6 @@
 pub mod json;
 pub mod lsp;
+pub mod lsp_server;
 pub mod subcommand_act;
 pub mod subcommand_completion;
 pub mod subcommand_find_def;
