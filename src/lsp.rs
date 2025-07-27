@@ -80,7 +80,7 @@ where
     Ok(content)
 }
 
-pub fn recv_message<R>(mut reader: R) -> orfail::Result<nojson::RawJsonOwned>
+pub fn recv_message<R>(mut reader: R) -> orfail::Result<Option<nojson::RawJsonOwned>>
 where
     R: BufRead,
 {
@@ -88,7 +88,9 @@ where
     loop {
         let mut line = String::new();
         let size = reader.read_line(&mut line).or_fail()?;
-        (size > 0).or_fail()?;
+        if size == 0 {
+            return Ok(None);
+        }
         if line == "\r\n" {
             break;
         }
@@ -108,7 +110,7 @@ where
     let json = nojson::RawJsonOwned::parse(&content).or_fail()?;
     check_jsonrpc_version(json.value()).or_fail()?;
 
-    Ok(json)
+    Ok(Some(json))
 }
 
 fn check_jsonrpc_version(

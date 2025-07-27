@@ -164,9 +164,7 @@ fn run_proxy_client(
     msg_tx: std::sync::mpsc::Sender<Message>,
 ) -> orfail::Result<()> {
     let mut stream = BufReader::new(stream);
-    loop {
-        // TODO: handle eos
-        let json = lsp::recv_message(&mut stream).or_fail()?;
+    while let Some(json) = lsp::recv_message(&mut stream).or_fail()? {
         let value = json.value();
         let method = value
             .to_member("method")
@@ -273,8 +271,7 @@ fn run_lsp_server_stdout_loop(
     mut stdout: &mut BufReader<ChildStdout>,
     msg_tx: std::sync::mpsc::Sender<Message>,
 ) -> orfail::Result<()> {
-    loop {
-        let json = lsp::recv_message(&mut stdout).or_fail()?;
+    while let Some(json) = lsp::recv_message(&mut stdout).or_fail()? {
         println!("{json}");
 
         let value = json.value();
@@ -351,7 +348,7 @@ where
     .or_fail()?;
     println!("{json}");
 
-    let json = lsp::recv_message(&mut reader).or_fail()?;
+    let json = lsp::recv_message(&mut reader).or_fail()?.or_fail()?;
     println!("{json}");
 
     let json = lsp::send_notification(&mut writer, "initialized", ()).or_fail()?;
@@ -368,7 +365,7 @@ where
     let json = lsp::send_request(&mut writer, SHUTDOWN_REQUEST_ID, "shutdown", ()).or_fail()?;
     println!("{json}");
 
-    let json = lsp::recv_message(&mut reader).or_fail()?;
+    let json = lsp::recv_message(&mut reader).or_fail()?.or_fail()?;
     println!("{json}");
 
     let json = lsp::send_notification(&mut writer, "exit", ()).or_fail()?;

@@ -56,7 +56,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     .or_fail()?;
 
     // Receive completion response
-    let response_json = lsp::recv_message(&mut stream).or_fail()?;
+    let response_json = lsp::recv_message(&mut stream).or_fail()?.or_fail()?;
     let response_value = response_json.value();
 
     // Check if there's an error in the response

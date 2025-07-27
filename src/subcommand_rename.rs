@@ -58,7 +58,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     lsp::send_request(stream.get_mut(), request_id, "textDocument/rename", params).or_fail()?;
 
     // Receive rename response
-    let response_json = lsp::recv_message(&mut stream).or_fail()?;
+    let response_json = lsp::recv_message(&mut stream).or_fail()?.or_fail()?;
     let response_value = response_json.value();
 
     // Check if there's an error in the response

@@ -75,17 +75,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         )?;
         f.member(
             "context",
-            nojson::object(|f| {
-                f.member("diagnostics", nojson::array(|_| Ok(())))?;
-                // Support filtering code actions by kind
-                // You could add this as a command-line option if needed:
-                // f.member("only", nojson::array(|f| {
-                //     f.element("quickfix")?;
-                //     f.element("refactor")?;
-                //     f.element("source")
-                // }))?;
-                Ok(())
-            }),
+            nojson::object(|f| f.member("diagnostics", nojson::array(|_| Ok(())))),
         )
     });
 
@@ -98,7 +88,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     .or_fail()?;
 
     // Receive code action response
-    let response_json = lsp::recv_message(&mut stream).or_fail()?;
+    let response_json = lsp::recv_message(&mut stream).or_fail()?.or_fail()?;
     let response_value = response_json.value();
 
     // Check if there's an error in the response
@@ -197,7 +187,8 @@ fn resolve_code_action(
     .map_err(|e| format!("Failed to send resolve request: {}", e))?;
 
     let response_json = lsp::recv_message(stream)
-        .map_err(|e| format!("Failed to receive resolve response: {}", e))?;
+        .map_err(|e| format!("Failed to receive resolve response: {}", e))?
+        .ok_or_else(|| "unexpected EOS")?;
     let response_value = response_json.value();
 
     if let Some(error) = response_value
@@ -409,7 +400,8 @@ fn execute_command(
     .map_err(|e| format!("Failed to send execute command request: {}", e))?;
 
     let response_json = lsp::recv_message(stream)
-        .map_err(|e| format!("Failed to receive execute command response: {}", e))?;
+        .map_err(|e| format!("Failed to receive execute command response: {}", e))?
+        .ok_or_else(|| "unexpected EOS")?;
     let response_value = response_json.value();
 
     if let Some(error) = response_value
