@@ -2,67 +2,61 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
 };
 
 use nojson::RawJsonOwned;
 use orfail::OrFail;
 
-use crate::lsp::{self, DocumentUri};
+use crate::{
+    DEFAULT_PORT,
+    lsp::{self, DocumentUri},
+};
 
 const INITIALIZE_REQUEST_ID: u32 = 1;
 const SHUTDOWN_REQUEST_ID: u32 = 0;
 
-#[derive(Debug, Default, Clone)]
-struct Args {
-    port: u16,
-    lsp_server_command: PathBuf,
-    lsp_server_args: Vec<PathBuf>,
-    lsp_server_config: Option<RawJsonOwned>,
-}
-
 pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
-    if !noargs::cmd("serve").take(&mut raw_args).is_present() {
+    if !noargs::cmd("serve")
+        .doc("TODO")
+        .take(&mut raw_args)
+        .is_present()
+    {
         return Ok(Some(raw_args));
     }
 
-    // TODO: Add '--' handling
-
-    let mut args = Args::default();
-    args.port = noargs::opt("port")
+    let port: u16 = noargs::opt("port")
         .short('p')
-        .default("9257")
+        .default(DEFAULT_PORT)
+        .doc("TODO")
         .env("LSPTERM_PORT")
         .take(&mut raw_args)
         .then(|a| a.value().parse())?;
-    args.lsp_server_config = noargs::opt("lsp-server-config")
+    let lsp_server_config_file_path: PathBuf = noargs::opt("lsp-server-config-file")
         .short('c')
-        .env("LSP_SERVER_CONFIG")
-        .take(&mut raw_args)
-        .present_and_then(|a| RawJsonOwned::parse(a.value()))?;
-    args.lsp_server_command = noargs::arg("LSP_SERVER_COMMAND")
-        .example("/path/to/lsp-server")
+        .example("/path/to/config.json")
+        .env("LSPTERM_LSP_SERVER_CONFIG_FILE")
         .take(&mut raw_args)
         .then(|a| a.value().parse())?;
-    while let Some(a) = noargs::arg("[LSP_SERVER_ARG]...")
-        .take(&mut raw_args)
-        .present()
-    {
-        args.lsp_server_args.push(a.value().parse()?);
-    }
 
     if let Some(help) = raw_args.finish()? {
         print!("{help}");
         return Ok(None);
     }
 
-    let mut lsp_server = spawn_lsp_server(&args).or_fail()?;
+    let lsp_server_spec = LspServerSpec::load(&lsp_server_config_file_path).or_fail()?;
+    let mut lsp_server = lsp_server_spec.spawn_process().or_fail()?;
     let mut lsp_server_stdin = lsp_server.stdin.take().or_fail()?;
     let mut lsp_server_stdout = BufReader::new(lsp_server.stdout.take().or_fail()?);
-    initialize_lsp_server(&args, &mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
+    initialize_lsp_server(
+        &lsp_server_spec,
+        &mut lsp_server_stdout,
+        &mut lsp_server_stdin,
+    )
+    .or_fail()?;
 
-    let listener = TcpListener::bind(("127.0.0.1", args.port)).or_fail()?;
+    let listener = TcpListener::bind(("127.0.0.1", port)).or_fail()?;
 
     let (lsp_server_msg_tx, lsp_server_msg_rx) = std::sync::mpsc::channel();
     let lsp_server_msg_tx_for_ls_server_thread = lsp_server_msg_tx.clone();
@@ -124,6 +118,44 @@ enum Message {
         result: Result<RawJsonOwned, RawJsonOwned>,
     },
     LspServerStdoutError,
+}
+
+#[derive(Debug)]
+struct LspServerSpec {
+    command: PathBuf,
+    args: Vec<String>,
+    initialize_options: Option<RawJsonOwned>,
+}
+
+impl LspServerSpec {
+    fn load(path: &Path) -> orfail::Result<Self> {
+        crate::json::parse_file(path, |value| {
+            Ok(Self {
+                command: value.to_member("command")?.required()?.try_into()?,
+                args: Option::try_from(value.to_member("args")?)?.unwrap_or_default(),
+                initialize_options: value
+                    .to_member("initializeOptions")?
+                    .get()
+                    .map(|v| v.extract().into_owned()),
+            })
+        })
+        .or_fail()
+    }
+
+    fn spawn_process(&self) -> orfail::Result<Child> {
+        Command::new(&self.command)
+            .args(&self.args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .or_fail_with(|e| {
+                format!(
+                    "failed to spawn LSP server process '{}': {e}",
+                    self.command.display()
+                )
+            })
+    }
 }
 
 fn run_proxy_client(
@@ -282,22 +314,11 @@ fn run_lsp_server_stdout_loop(
     Ok(())
 }
 
-fn spawn_lsp_server(args: &Args) -> orfail::Result<Child> {
-    let mut command = Command::new(&args.lsp_server_command);
-    command
-        .args(&args.lsp_server_args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
-    command.spawn().or_fail_with(|e| {
-        format!(
-            "failed to spawn LSP server process '{}': {e}",
-            args.lsp_server_command.display()
-        )
-    })
-}
-
-fn initialize_lsp_server<R, W>(args: &Args, mut reader: R, mut writer: W) -> orfail::Result<()>
+fn initialize_lsp_server<R, W>(
+    spec: &LspServerSpec,
+    mut reader: R,
+    mut writer: W,
+) -> orfail::Result<()>
 where
     R: BufRead,
     W: Write,
@@ -318,8 +339,8 @@ where
                 f.member("general", create_general_capabilities())
             }),
         )?;
-        if let Some(config) = &args.lsp_server_config {
-            f.member("initializationOptions", config)?;
+        if let Some(options) = &spec.initialize_options {
+            f.member("initializationOptions", options)?;
         }
         Ok(())
     });

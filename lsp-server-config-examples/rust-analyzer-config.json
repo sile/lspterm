@@ -1,0 +1,7 @@
+{
+  "command": "rust-analyzer",
+  "args": [],
+  "initializationOptions": {
+    "checkOnSave": false
+  }
+}
