@@ -110,12 +110,19 @@ fn run_lsp_server(
 }
 
 fn run_lsp_server_stdout_loop(
-    stdout: &mut BufReader<ChildStdout>,
+    mut stdout: &mut BufReader<ChildStdout>,
     msg_tx: std::sync::mpsc::Sender<Message>,
 ) {
     loop {
-        let mut line = String::new();
-        let _ = stdout.read_line(&mut line);
+        let json = match lsp::recv_json(&mut stdout).or_fail() {
+            Err(e) => {
+                eprintln!("[ERROR] failed to read LSP server stdout: {e}");
+                let _ = msg_tx.send(Message::Error);
+                break;
+            }
+            Ok(json) => json,
+        };
+        println!("{json}");
     }
 }
 
