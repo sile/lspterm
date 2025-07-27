@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     io::{BufRead, BufReader, Write},
     net::TcpListener,
     path::PathBuf,
@@ -84,8 +85,15 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
 
 #[derive(Debug)]
 enum Message {
-    Request,
-    Notification,
+    Request {
+        method: String,
+        params: RawJsonOwned,
+        reply_tx: std::sync::mpsc::Sender<Result<RawJsonOwned, RawJsonOwned>>,
+    },
+    Notification {
+        method: String,
+        params: RawJsonOwned,
+    },
     ResponseFromLspServer {
         request_id: u32,
         result: Result<RawJsonOwned, RawJsonOwned>,
@@ -94,7 +102,7 @@ enum Message {
         request_id: RawJsonOwned,
         result: Result<RawJsonOwned, RawJsonOwned>,
     },
-    Error,
+    LspServerStdoutError,
 }
 
 fn run_lsp_server(
@@ -106,16 +114,53 @@ fn run_lsp_server(
     std::thread::scope(|s| {
         s.spawn(|| {
             if let Err(e) = run_lsp_server_stdout_loop(stdout, msg_tx.clone()).or_fail() {
-                eprintln!("[ERROR] failed to read LSP server stdout: {e}");
-                let _ = msg_tx.send(Message::Error);
+                eprintln!("[ERROR] failed to read from LSP server stdout: {e}");
+                let _ = msg_tx.send(Message::LspServerStdoutError);
             }
         });
         s.spawn(move || {
-            loop {
-                let _ = msg_rx.recv();
+            if let Err(e) = run_lsp_server_stdin_loop(stdin, msg_rx).or_fail() {
+                eprintln!("[ERROR] failed to write to LSP server stdout: {e}");
             }
         });
     });
+    Ok(())
+}
+
+fn run_lsp_server_stdin_loop(
+    mut stdin: &mut ChildStdin,
+    msg_rx: std::sync::mpsc::Receiver<Message>,
+) -> orfail::Result<()> {
+    let mut ongoing_requests = HashMap::new();
+    let mut next_request_id = INITIALIZE_REQUEST_ID + 1;
+    while let Ok(msg) = msg_rx.recv() {
+        match msg {
+            Message::Request {
+                method,
+                params,
+                reply_tx,
+            } => {
+                let json =
+                    lsp::send_request(&mut stdin, next_request_id, &method, params).or_fail()?;
+                println!("{json}");
+                ongoing_requests.insert(next_request_id, reply_tx);
+                next_request_id += 1;
+            }
+            Message::Notification { method, params } => {
+                let json = lsp::send_notification(&mut stdin, &method, params).or_fail()?;
+                println!("{json}");
+            }
+            Message::ResponseFromLspServer { request_id, result } => {
+                let reply_tx = ongoing_requests.remove(&request_id).or_fail()?;
+                let _ = reply_tx.send(result);
+            }
+            Message::ResponseToLspServer { request_id, result } => {
+                let json = lsp::send_response(&mut stdin, request_id, result).or_fail()?;
+                println!("{json}");
+            }
+            Message::LspServerStdoutError => break,
+        }
+    }
     Ok(())
 }
 

@@ -51,6 +51,35 @@ where
     Ok(content)
 }
 
+pub fn send_response<W, I, T, E>(
+    mut writer: W,
+    request_id: I,
+    result: Result<T, E>,
+) -> orfail::Result<String>
+where
+    W: Write,
+    I: nojson::DisplayJson,
+    T: nojson::DisplayJson,
+    E: nojson::DisplayJson,
+{
+    let content = nojson::object(|f| {
+        f.member("jsonrpc", "2.0")?;
+        f.member("id", &request_id)?;
+        match &result {
+            Ok(v) => f.member("result", v),
+            Err(v) => f.member("error", v),
+        }
+    })
+    .to_string();
+
+    write!(writer, "Content-Length: {}\r\n", content.len()).or_fail()?;
+    write!(writer, "\r\n").or_fail()?;
+    write!(writer, "{content}").or_fail()?;
+    writer.flush().or_fail()?;
+
+    Ok(content)
+}
+
 pub fn recv_message<R>(mut reader: R) -> orfail::Result<nojson::RawJsonOwned>
 where
     R: BufRead,
