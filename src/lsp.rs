@@ -133,6 +133,11 @@ impl DocumentUri {
         let path = path.as_ref().canonicalize().or_fail()?;
         Ok(Self(path))
     }
+
+    pub fn read_to_string(&self) -> orfail::Result<String> {
+        std::fs::read_to_string(&self.0)
+            .or_fail_with(|e| format!("failed to read file '{}': {e}", self.0.display()))
+    }
 }
 
 impl nojson::DisplayJson for DocumentUri {

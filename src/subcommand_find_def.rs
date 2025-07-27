@@ -1,11 +1,10 @@
-use std::path::PathBuf;
+use std::{net::TcpStream, path::PathBuf};
 
 use orfail::OrFail;
 
 use crate::{
-    json::{JsonRpcNotification, JsonRpcRequest, JsonRpcResponse, JsonValue},
-    lsp_client::{LspClient, LspClientOptions},
-    subcommand_initialize::initialize,
+    json::{JsonRpcRequest, JsonRpcResponse, JsonValue},
+    lsp::{self, DocumentUri},
 };
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -13,7 +12,12 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         return Ok(Some(args));
     }
 
-    let options = LspClientOptions::parse_args(&mut args)?;
+    let port: u16 = noargs::opt("port")
+        .short('p')
+        .default("9257")
+        .env("LSPTERM_PORT")
+        .take(&mut args)
+        .then(|a| a.value().parse())?;
     let file = noargs::arg("FILE")
         .take(&mut args)
         .then(|a| a.value().parse::<PathBuf>())?;
@@ -29,60 +33,25 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         return Ok(None);
     }
 
-    let mut lsp_client = LspClient::new(options).or_fail()?;
-    initialize(&mut lsp_client).or_fail()?;
-    // TODO: capability check
+    let file = DocumentUri::new(file).or_fail()?;
+    let content = file.read_to_string().or_fail()?;
 
-    let file = file.canonicalize().or_fail()?;
-    let did_open = DidOpenNotification::new(&file).or_fail()?;
-    lsp_client.cast(did_open).or_fail()?;
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).or_fail()?;
 
-    for i in 0..10 {
-        let req = DefinitionRequest::new(file.clone(), line, character).or_fail()?;
-        let Ok(res) = lsp_client.call(req).or_fail() else {
-            continue; // TODO
-        };
-        println!("[{i}] {}", nojson::Json(res.value));
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-
-    Ok(None)
-}
-
-#[derive(Debug)]
-pub struct DidOpenNotification {
-    file: PathBuf,
-    content: String,
-}
-
-impl DidOpenNotification {
-    pub fn new(file: &PathBuf) -> orfail::Result<Self> {
-        let content = std::fs::read_to_string(file)
-            .or_fail_with(|e| format!("failed to read file '{}': {e}", file.display()))?;
-        Ok(Self {
-            file: file.clone(),
-            content,
-        })
-    }
-}
-
-impl JsonRpcNotification for DidOpenNotification {
-    fn method(&self) -> &str {
-        "textDocument/didOpen"
-    }
-
-    fn params(&self, f: &mut nojson::JsonObjectFormatter<'_, '_, '_>) -> std::fmt::Result {
+    let params = nojson::object(|f| {
         f.member(
             "textDocument",
             nojson::object(|f| {
-                f.member("uri", format!("file://{}", self.file.display()))?;
+                f.member("uri", &file)?;
                 f.member("languageId", "rust")?; // TODO
                 f.member("version", 1)?;
-                f.member("text", &self.content)
+                f.member("text", &content)
             }),
-        )?;
-        Ok(())
-    }
+        )
+    });
+    lsp::send_notification(&mut stream, "textDocument/didOpen", params).or_fail()?;
+
+    Ok(None)
 }
 
 #[derive(Debug)]

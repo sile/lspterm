@@ -159,6 +159,7 @@ fn run_proxy_client(
                 Some((id, reply_rx)),
             )
         } else {
+            // TODO: handle didOpen to automatically close when disconnected
             (Message::Notification { method, params }, None)
         };
         if msg_tx.send(msg).is_err() {
