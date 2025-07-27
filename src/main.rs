@@ -24,6 +24,9 @@ fn main() -> noargs::Result<()> {
     let Some(args) = lspterm::subcommand_hover::try_run(args)? else {
         return Ok(());
     };
+    let Some(args) = lspterm::subcommand_act::try_run(args)? else {
+        return Ok(());
+    };
 
     if let Some(help) = args.finish()? {
         print!("{help}");
