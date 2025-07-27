@@ -31,22 +31,8 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     }
 
     let file = DocumentUri::new(file).or_fail()?;
-    let content = file.read_to_string().or_fail()?;
 
     let mut stream = BufReader::new(TcpStream::connect(("127.0.0.1", port)).or_fail()?);
-
-    let params = nojson::object(|f| {
-        f.member(
-            "textDocument",
-            nojson::object(|f| {
-                f.member("uri", &file)?;
-                f.member("languageId", "rust")?; // TODO
-                f.member("version", 1)?;
-                f.member("text", &content)
-            }),
-        )
-    });
-    lsp::send_notification(stream.get_mut(), "textDocument/didOpen", params).or_fail()?;
 
     // Send definition request
     let request_id = 1;
