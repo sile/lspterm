@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Write},
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     path::PathBuf,
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
 };
@@ -62,23 +62,38 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     let mut lsp_server_stdout = BufReader::new(lsp_server.stdout.take().or_fail()?);
     initialize_lsp_server(&args, &mut lsp_server_stdout, &mut lsp_server_stdin).or_fail()?;
 
-    let _listener = TcpListener::bind(("127.0.0.1", args.port)).or_fail()?;
+    let listener = TcpListener::bind(("127.0.0.1", args.port)).or_fail()?;
 
     let (lsp_server_msg_tx, lsp_server_msg_rx) = std::sync::mpsc::channel();
+    let lsp_server_msg_tx_for_ls_server_thread = lsp_server_msg_tx.clone();
     let lsp_server_thread_handle = std::thread::spawn(move || {
         if let Err(e) = run_lsp_server(
             &mut lsp_server_stdin,
             &mut lsp_server_stdout,
-            lsp_server_msg_tx,
+            lsp_server_msg_tx_for_ls_server_thread,
             lsp_server_msg_rx,
         )
         .or_fail()
         {
-            eprintln!("failed to run lsp server: {e}");
+            eprintln!("[ERROR] failed to run lsp server: {e}");
         }
         (lsp_server_stdin, lsp_server_stdout)
     });
-    lsp_server_thread_handle.is_finished();
+
+    for incoming in listener.incoming() {
+        if lsp_server_thread_handle.is_finished() {
+            eprintln!("[WARN] LSP server thread has finished");
+            break;
+        }
+
+        let incoming = incoming.or_fail()?;
+        let lsp_server_msg_tx = lsp_server_msg_tx.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = run_proxy_client(incoming, lsp_server_msg_tx) {
+                eprintln!("[WARN] failed to run proxy client: {e}");
+            }
+        });
+    }
 
     let (lsp_server_stdin, lsp_server_stdout) = lsp_server_thread_handle
         .join()
@@ -93,12 +108,12 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
 enum Message {
     Request {
         method: String,
-        params: RawJsonOwned,
+        params: Option<RawJsonOwned>,
         reply_tx: std::sync::mpsc::Sender<Result<RawJsonOwned, RawJsonOwned>>,
     },
     Notification {
         method: String,
-        params: RawJsonOwned,
+        params: Option<RawJsonOwned>,
     },
     ResponseFromLspServer {
         request_id: u32,
@@ -109,6 +124,55 @@ enum Message {
         result: Result<RawJsonOwned, RawJsonOwned>,
     },
     LspServerStdoutError,
+}
+
+fn run_proxy_client(
+    stream: TcpStream,
+    msg_tx: std::sync::mpsc::Sender<Message>,
+) -> orfail::Result<()> {
+    let mut stream = BufReader::new(stream);
+    loop {
+        let json = lsp::recv_message(&mut stream).or_fail()?;
+        let value = json.value();
+        let method = value
+            .to_member("method")
+            .or_fail()?
+            .required()
+            .or_fail()?
+            .to_unquoted_string_str()
+            .or_fail()?
+            .into_owned();
+        let params = value
+            .to_member("params")
+            .or_fail()?
+            .map(|v| Ok(v.extract().into_owned()))
+            .or_fail()?;
+        let id = value.to_member("id").or_fail()?.get();
+        let (msg, id_and_reply_rx) = if let Some(id) = id {
+            let (reply_tx, reply_rx) = std::sync::mpsc::channel();
+            (
+                Message::Request {
+                    method,
+                    params,
+                    reply_tx,
+                },
+                Some((id, reply_rx)),
+            )
+        } else {
+            (Message::Notification { method, params }, None)
+        };
+        if msg_tx.send(msg).is_err() {
+            break;
+        }
+
+        if let Some((id, reply_rx)) = id_and_reply_rx {
+            let Ok(result) = reply_rx.recv() else {
+                break;
+            };
+            lsp::send_response(stream.get_mut(), id, result).or_fail()?;
+        }
+    }
+    Ok(())
 }
 
 fn run_lsp_server(
