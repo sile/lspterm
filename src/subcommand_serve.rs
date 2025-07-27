@@ -19,7 +19,7 @@ const SHUTDOWN_REQUEST_ID: u32 = 0;
 
 pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("serve")
-        .doc("TODO")
+        .doc("Start LSP proxy server that forwards requests to a configured LSP server")
         .take(&mut raw_args)
         .is_present()
     {
@@ -29,12 +29,13 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     let port: u16 = noargs::opt("port")
         .short('p')
         .default(DEFAULT_PORT)
-        .doc("TODO")
+        .doc("Port number to bind the proxy server to")
         .env("LSPTERM_PORT")
         .take(&mut raw_args)
         .then(|a| a.value().parse())?;
     let lsp_server_config_file_path: PathBuf = noargs::opt("lsp-server-config-file")
         .short('c')
+        .doc("Path to JSON configuration file specifying the LSP server command and options")
         .example("/path/to/config.json")
         .env("LSPTERM_LSP_SERVER_CONFIG_FILE")
         .take(&mut raw_args)
