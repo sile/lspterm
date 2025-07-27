@@ -77,10 +77,12 @@ where
     let content = String::from_utf8(content).or_fail()?;
 
     let json = nojson::RawJsonOwned::parse(&content).or_fail()?;
+    check_jsonrpc_version(json.value()).or_fail()?;
+
     Ok(json)
 }
 
-pub fn recv_ok_response<R, T>(mut reader: R, request_id: u32) -> orfail::Result<(T, String)>
+pub fn recv_ok_response<R, T>(reader: R, request_id: u32) -> orfail::Result<(T, String)>
 where
     R: BufRead,
     T: for<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>, Error = nojson::JsonParseError>,
@@ -88,8 +90,6 @@ where
     let json = recv_json(reader).or_fail()?;
     let value = json.value();
     let parse = || -> Result<T, nojson::JsonParseError> {
-        check_jsonrpc_version(value)?;
-
         if let Some(method) = value.to_member("method")?.get() {
             return Err(method.invalid("expected a response, but got request"));
         }
@@ -106,7 +106,6 @@ where
         let result = value.to_member("result")?.required()?;
         result.try_into()
     };
-    check_jsonrpc_version(value).or_fail()?;
 
     parse().map(|v| (v, json.to_string())).or_fail()
 }
