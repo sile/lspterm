@@ -51,7 +51,7 @@ where
     Ok(content)
 }
 
-pub fn recv_json<R>(mut reader: R) -> orfail::Result<nojson::RawJsonOwned>
+pub fn recv_message<R>(mut reader: R) -> orfail::Result<nojson::RawJsonOwned>
 where
     R: BufRead,
 {
@@ -80,34 +80,6 @@ where
     check_jsonrpc_version(json.value()).or_fail()?;
 
     Ok(json)
-}
-
-pub fn recv_ok_response<R, T>(reader: R, request_id: u32) -> orfail::Result<(T, String)>
-where
-    R: BufRead,
-    T: for<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>, Error = nojson::JsonParseError>,
-{
-    let json = recv_json(reader).or_fail()?;
-    let value = json.value();
-    let parse = || -> Result<T, nojson::JsonParseError> {
-        if let Some(method) = value.to_member("method")?.get() {
-            return Err(method.invalid("expected a response, but got request"));
-        }
-
-        let id = value.to_member("id")?.required()?;
-        if u32::try_from(id)? != request_id {
-            return Err(id.invalid(format!("expected ID {request_id}, but got {id}")));
-        }
-
-        if let Some(error) = value.to_member("error")?.get() {
-            return Err(error.invalid("expected a success response, but got a error response"));
-        }
-
-        let result = value.to_member("result")?.required()?;
-        result.try_into()
-    };
-
-    parse().map(|v| (v, json.to_string())).or_fail()
 }
 
 fn check_jsonrpc_version(

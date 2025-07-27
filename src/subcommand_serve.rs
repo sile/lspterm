@@ -8,10 +8,7 @@ use std::{
 use nojson::RawJsonOwned;
 use orfail::OrFail;
 
-use crate::{
-    json::JsonValue,
-    lsp::{self, DocumentUri},
-};
+use crate::lsp::{self, DocumentUri};
 
 const INITIALIZE_REQUEST_ID: u32 = 1;
 const SHUTDOWN_REQUEST_ID: u32 = 0;
@@ -127,7 +124,7 @@ fn run_lsp_server_stdout_loop(
     msg_tx: std::sync::mpsc::Sender<Message>,
 ) -> orfail::Result<()> {
     loop {
-        let json = lsp::recv_json(&mut stdout).or_fail()?;
+        let json = lsp::recv_message(&mut stdout).or_fail()?;
         println!("{json}");
 
         let value = json.value();
@@ -231,8 +228,7 @@ where
     .or_fail()?;
     println!("{json}");
 
-    let (_, json): (JsonValue, _) =
-        lsp::recv_ok_response(&mut reader, INITIALIZE_REQUEST_ID).or_fail()?;
+    let json = lsp::recv_message(&mut reader).or_fail()?;
     println!("{json}");
 
     let json = lsp::send_notification(&mut writer, "initialized", ()).or_fail()?;
@@ -249,8 +245,7 @@ where
     let json = lsp::send_request(&mut writer, SHUTDOWN_REQUEST_ID, "shutdown", ()).or_fail()?;
     println!("{json}");
 
-    let (_, json): (JsonValue, _) =
-        lsp::recv_ok_response(&mut reader, SHUTDOWN_REQUEST_ID).or_fail()?;
+    let json = lsp::recv_message(&mut reader).or_fail()?;
     println!("{json}");
 
     let json = lsp::send_notification(&mut writer, "exit", ()).or_fail()?;
