@@ -136,6 +136,13 @@ impl DocumentUri {
         Ok(Self(path))
     }
 
+    pub fn new_dir<P: AsRef<Path>>(path: P) -> orfail::Result<Self> {
+        let path = path.as_ref().canonicalize().or_fail()?;
+        path.is_dir()
+            .or_fail_with(|()| format!("path '{}' is not a directory", path.display()))?;
+        Ok(Self(path))
+    }
+
     pub fn read_to_string(&self) -> orfail::Result<String> {
         std::fs::read_to_string(&self.0)
             .or_fail_with(|e| format!("failed to read file '{}': {e}", self.0.display()))

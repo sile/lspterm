@@ -7,7 +7,8 @@ use std::{
 use orfail::OrFail;
 
 use crate::{
-    DEFAULT_PORT, lsp,
+    DEFAULT_PORT,
+    lsp::{self, DocumentUri},
     lsp_server::{LspMessage, LspServer, LspServerSpec},
 };
 
@@ -20,6 +21,11 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
         return Ok(Some(raw_args));
     }
 
+    let workspace_folder: Option<PathBuf> = noargs::opt("workspace-folder")
+        .short('w')
+        .doc("Path to workspace folder (defaults to current directory)")
+        .take(&mut raw_args)
+        .present_and_then(|a| a.value().parse())?;
     let port: u16 = noargs::opt("port")
         .short('p')
         .default(DEFAULT_PORT)
@@ -40,10 +46,16 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
         return Ok(None);
     }
 
+    let workspace_folder_uri = if let Some(path) = workspace_folder {
+        DocumentUri::new_dir(path).or_fail()?
+    } else {
+        DocumentUri::new(std::env::current_dir().or_fail()?).or_fail()?
+    };
+
     let lsp_server_spec = LspServerSpec::load(&lsp_server_config_file_path).or_fail()?;
     let listener = TcpListener::bind(("127.0.0.1", port)).or_fail()?;
 
-    let lsp_server = LspServer::new(&lsp_server_spec).or_fail()?;
+    let lsp_server = LspServer::new(lsp_server_spec, workspace_folder_uri).or_fail()?;
     let lsp_server_msg_tx = lsp_server.message_sender();
 
     for incoming in listener.incoming() {

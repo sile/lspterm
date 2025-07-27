@@ -82,13 +82,14 @@ pub struct LspServer {
 }
 
 impl LspServer {
-    pub fn new(spec: &LspServerSpec) -> orfail::Result<Self> {
+    pub fn new(spec: LspServerSpec, workspace_folder_uri: DocumentUri) -> orfail::Result<Self> {
         let mut process = spec.spawn_process().or_fail()?;
         let mut stdin = process.stdin.take().or_fail()?;
         let mut stdout = BufReader::new(process.stdout.take().or_fail()?);
 
         // Initialize the LSP server
-        Self::initialize_lsp_server(spec, &mut stdout, &mut stdin).or_fail()?;
+        Self::initialize_lsp_server(&spec, workspace_folder_uri, &mut stdout, &mut stdin)
+            .or_fail()?;
 
         let (message_tx, message_rx) = std::sync::mpsc::channel();
         let message_tx_for_stdout = message_tx.clone();
@@ -159,6 +160,7 @@ impl LspServer {
 
     fn initialize_lsp_server<R, W>(
         spec: &LspServerSpec,
+        workspace_folder_uri: DocumentUri,
         mut reader: R,
         mut writer: W,
     ) -> orfail::Result<()>
@@ -166,9 +168,6 @@ impl LspServer {
         R: BufRead,
         W: Write,
     {
-        let workspace_folder_uri =
-            DocumentUri::new(std::env::current_dir().or_fail()?).or_fail()?;
-
         let params = nojson::object(|f| {
             f.member("clientInfo", Self::client_info())?;
             f.member(
