@@ -1,6 +1,7 @@
 pub mod json;
 pub mod lsp;
 pub mod lsp_server;
+pub mod proxy_client;
 pub mod proxy_server;
 pub mod subcommand_act;
 pub mod subcommand_completion;
