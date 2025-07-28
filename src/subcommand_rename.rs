@@ -1,11 +1,8 @@
-use std::{io::BufReader, net::TcpStream, path::PathBuf};
+use std::path::PathBuf;
 
 use orfail::OrFail;
 
-use crate::{
-    lsp::{self, DocumentUri},
-    proxy_server::DEFAULT_PORT,
-};
+use crate::{lsp::DocumentUri, proxy_client::ProxyClient, proxy_server::DEFAULT_PORT};
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("rename")
@@ -47,10 +44,8 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     let file = DocumentUri::new(file).or_fail()?;
 
-    let mut stream = BufReader::new(TcpStream::connect(("127.0.0.1", port)).or_fail()?);
+    let mut client = ProxyClient::connect(port).or_fail()?;
 
-    // Send rename request
-    let request_id = 1;
     let params = nojson::object(|f| {
         f.member("textDocument", nojson::object(|f| f.member("uri", &file)))?;
         f.member(
@@ -62,29 +57,11 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         )?;
         f.member("newName", &new_name)
     });
-
-    lsp::send_request(stream.get_mut(), request_id, "textDocument/rename", params).or_fail()?;
-
-    // Receive rename response
-    let response_json = lsp::recv_message(&mut stream).or_fail()?.or_fail()?;
-    let response_value = response_json.value();
-
-    // Check if there's an error in the response
-    if let Some(error) = response_value.to_member("error").or_fail()?.get() {
-        eprintln!("LSP server returned error: {error}");
-        return Ok(None);
-    }
-
-    // Parse and display the result
-    let result = response_value
-        .to_member("result")
-        .or_fail()?
-        .required()
-        .or_fail()?;
+    let result = client.call("textDocument/rename", params).or_fail()?;
     println!("{result}");
 
     if apply {
-        apply_workspace_edit(result).or_fail()?;
+        apply_workspace_edit(result.value()).or_fail()?;
     }
 
     Ok(None)
