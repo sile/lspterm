@@ -30,9 +30,7 @@ impl LspServerSpec {
             Ok(Self {
                 command: object.convert_required("command")?,
                 args: object.convert_optional_or_default("args")?,
-                initialize_options: object
-                    .get_optional("initialize_options")?
-                    .map(|v| v.extract().into_owned()),
+                initialize_options: object.convert_optional("initialize_options")?,
             })
         })
         .or_fail()
