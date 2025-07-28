@@ -4,7 +4,7 @@ use orfail::OrFail;
 
 use crate::{
     lsp::{self, DocumentUri},
-    proxy::DEFAULT_PORT,
+    proxy_server::DEFAULT_PORT,
 };
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
