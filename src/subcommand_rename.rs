@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use orfail::OrFail;
 
-use crate::{lsp::DocumentUri, proxy_client::ProxyClient, proxy_server::DEFAULT_PORT};
+use crate::{proxy_client::ProxyClient, proxy_server::DEFAULT_PORT, target::TargetLocation};
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("rename")
@@ -24,23 +24,13 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .short('a')
         .take(&mut args)
         .is_present();
-
-    // let target_location = noargs::opt("target-location")
-    // .short('t')
-    // .doc("Target location for rename in format FILE:LINE:CHARACTER")
-    // .take(&mut args)
-    // .then(|a| parse_location(a.value()))?;
-
-    let file = noargs::arg("FILE")
+    let target: TargetLocation = noargs::opt("target-location")
+        .short('t')
+        .env("LSPTERM_TARGET_LOCATION")
+        .example("/path/to/file:0:5")
+        .doc("Target location for rename in format FILE[:LINE[:CHARACTER]]")
         .take(&mut args)
-        .then(|a| a.value().parse::<PathBuf>())?;
-    let line = noargs::arg("LINE")
-        .take(&mut args)
-        .then(|a| a.value().parse::<u32>())?;
-    let character = noargs::arg("CHARACTER")
-        .take(&mut args)
-        .then(|a| a.value().parse::<u32>())?;
-
+        .then(|a| a.value().parse())?;
     let new_name: String = noargs::arg("NEW_NAME")
         .take(&mut args)
         .then(|a| a.value().parse())?;
@@ -50,19 +40,10 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         return Ok(None);
     }
 
-    let file = DocumentUri::new(file).or_fail()?;
-
     let mut client = ProxyClient::connect(port).or_fail()?;
 
     let params = nojson::object(|f| {
-        f.member("textDocument", nojson::object(|f| f.member("uri", &file)))?;
-        f.member(
-            "position",
-            nojson::object(|f| {
-                f.member("line", line)?;
-                f.member("character", character)
-            }),
-        )?;
+        target.fmt_json_object(f)?;
         f.member("newName", &new_name)
     });
     let result = client.call("textDocument/rename", params).or_fail()?;

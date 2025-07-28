@@ -7,6 +7,26 @@ pub struct TargetLocation {
     pub character: usize,
 }
 
+impl TargetLocation {
+    pub fn fmt_json_object(
+        &self,
+        f: &mut nojson::JsonObjectFormatter<'_, '_, '_>,
+    ) -> std::fmt::Result {
+        f.member(
+            "textDocument",
+            nojson::object(|f| f.member("uri", &self.file)),
+        )?;
+        f.member(
+            "position",
+            nojson::object(|f| {
+                f.member("line", self.line)?;
+                f.member("character", self.character)
+            }),
+        )?;
+        Ok(())
+    }
+}
+
 impl std::str::FromStr for TargetLocation {
     type Err = String;
 
