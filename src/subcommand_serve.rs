@@ -1,15 +1,11 @@
-use std::{
-    io::BufReader,
-    net::{TcpListener, TcpStream},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use orfail::OrFail;
 
 use crate::{
-    DEFAULT_PORT,
-    lsp::{self, DocumentUri},
-    lsp_server::{LspMessage, LspServer, LspServerSpec},
+    lsp::DocumentUri,
+    lsp_server::LspServerSpec,
+    proxy_server::{DEFAULT_PORT, ProxyServer, ProxyServerConfig},
 };
 
 pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -53,71 +49,14 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
     };
 
     let lsp_server_spec = LspServerSpec::load(&lsp_server_config_file_path).or_fail()?;
-    let listener = TcpListener::bind(("127.0.0.1", port)).or_fail()?;
 
-    let lsp_server = LspServer::new(lsp_server_spec, workspace_folder_uri).or_fail()?;
-    let lsp_server_msg_tx = lsp_server.message_sender();
-
-    for incoming in listener.incoming() {
-        let incoming = incoming.or_fail()?;
-        let lsp_server_msg_tx = lsp_server_msg_tx.clone();
-        std::thread::spawn(move || {
-            if let Err(e) = run_proxy_client(incoming, lsp_server_msg_tx) {
-                eprintln!("[WARN] failed to run proxy client: {e}");
-            }
-        });
-    }
-
-    lsp_server.shutdown().or_fail()?;
+    let config = ProxyServerConfig {
+        port,
+        workspace_folder_uri,
+        lsp_server_spec,
+    };
+    let proxy_server = ProxyServer::new(config);
+    proxy_server.run().or_fail()?;
 
     Ok(None)
-}
-
-fn run_proxy_client(
-    stream: TcpStream,
-    msg_tx: std::sync::mpsc::Sender<LspMessage>,
-) -> orfail::Result<()> {
-    let mut stream = BufReader::new(stream);
-    while let Some(json) = lsp::recv_message(&mut stream).or_fail()? {
-        let value = json.value();
-        let method = value
-            .to_member("method")
-            .or_fail()?
-            .required()
-            .or_fail()?
-            .to_unquoted_string_str()
-            .or_fail()?
-            .into_owned();
-        let params = value
-            .to_member("params")
-            .or_fail()?
-            .map(|v| Ok(v.extract().into_owned()))
-            .or_fail()?;
-        let id = value.to_member("id").or_fail()?.get();
-        let (msg, id_and_reply_rx) = if let Some(id) = id {
-            let (reply_tx, reply_rx) = std::sync::mpsc::channel();
-            (
-                LspMessage::Request {
-                    method,
-                    params,
-                    reply_tx,
-                },
-                Some((id, reply_rx)),
-            )
-        } else {
-            // TODO: handle didOpen to automatically close when disconnected
-            (LspMessage::Notification { method, params }, None)
-        };
-        if msg_tx.send(msg).is_err() {
-            break;
-        }
-
-        if let Some((id, reply_rx)) = id_and_reply_rx {
-            let Ok(result) = reply_rx.recv() else {
-                break;
-            };
-            lsp::send_response(stream.get_mut(), id, result).or_fail()?;
-        }
-    }
-    Ok(())
 }
