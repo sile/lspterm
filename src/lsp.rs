@@ -132,7 +132,7 @@ pub struct DocumentUri(PathBuf);
 
 impl DocumentUri {
     pub fn new<P: AsRef<Path>>(path: P) -> orfail::Result<Self> {
-        let path = path.as_ref().canonicalize().or_fail()?;
+        let path = std::path::absolute(path).or_fail()?;
         Ok(Self(path))
     }
 
@@ -146,6 +146,13 @@ impl DocumentUri {
     pub fn read_to_string(&self) -> orfail::Result<String> {
         std::fs::read_to_string(&self.0)
             .or_fail_with(|e| format!("failed to read file '{}': {e}", self.0.display()))
+    }
+
+    pub fn check_existence(&self) -> orfail::Result<()> {
+        self.0
+            .exists()
+            .or_fail_with(|()| format!("file '{}' does not exist", self.0.display()))?;
+        Ok(())
     }
 }
 
