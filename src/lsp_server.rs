@@ -17,6 +17,28 @@ use crate::{
 const INITIALIZE_REQUEST_ID: u32 = 0;
 
 #[derive(Debug)]
+pub enum LspMessage {
+    Request {
+        method: String,
+        params: Option<RawJsonOwned>,
+        reply_tx: Sender<Result<RawJsonOwned, RawJsonOwned>>,
+    },
+    Notification {
+        method: String,
+        params: Option<RawJsonOwned>,
+    },
+    ResponseFromLspServer {
+        request_id: u32,
+        result: Result<RawJsonOwned, RawJsonOwned>,
+    },
+    ResponseToLspServer {
+        request_id: RawJsonOwned,
+        result: Result<RawJsonOwned, RawJsonOwned>,
+    },
+    LspServerStdoutError,
+}
+
+#[derive(Debug)]
 pub struct LspServerSpec {
     pub command: PathBuf,
     pub args: Vec<String>,
@@ -53,27 +75,6 @@ impl LspServerSpec {
 }
 
 #[derive(Debug)]
-pub enum LspMessage {
-    Request {
-        method: String,
-        params: Option<RawJsonOwned>,
-        reply_tx: Sender<Result<RawJsonOwned, RawJsonOwned>>,
-    },
-    Notification {
-        method: String,
-        params: Option<RawJsonOwned>,
-    },
-    ResponseFromLspServer {
-        request_id: u32,
-        result: Result<RawJsonOwned, RawJsonOwned>,
-    },
-    ResponseToLspServer {
-        request_id: RawJsonOwned,
-        result: Result<RawJsonOwned, RawJsonOwned>,
-    },
-    LspServerStdoutError,
-}
-
 pub struct LspServer {
     process: Child,
     message_tx: Sender<LspMessage>,
@@ -118,13 +119,12 @@ impl LspServer {
         params: Option<RawJsonOwned>,
     ) -> orfail::Result<Receiver<Result<RawJsonOwned, RawJsonOwned>>> {
         let (reply_tx, reply_rx) = std::sync::mpsc::channel();
-        self.message_tx
-            .send(LspMessage::Request {
-                method,
-                params,
-                reply_tx,
-            })
-            .or_fail()?;
+        let message = LspMessage::Request {
+            method,
+            params,
+            reply_tx,
+        };
+        self.message_tx.send(message).or_fail()?;
         Ok(reply_rx)
     }
 
@@ -201,12 +201,12 @@ impl LspServer {
         while let Some(json) = lsp::recv_message(&mut stdout).or_fail()? {
             println!("<-- {json}");
 
-            let value = json.value();
-            let Some(request_id) = value.to_member("id").or_fail()?.get() else {
+            let object = JsonObject::new(json.value()).or_fail()?;
+            let Some(request_id) = object.get_optional("id") else {
                 continue;
             };
 
-            let msg = if let Some(method) = value.to_member("method").or_fail()?.get() {
+            let msg = if let Some(method) = object.get_optional("method") {
                 let request_id = request_id.extract().into_owned();
                 let method = method.to_unquoted_string_str().or_fail()?;
                 match method.as_ref() {
@@ -224,10 +224,10 @@ impl LspServer {
                 }
             } else {
                 let request_id = u32::try_from(request_id).or_fail()?;
-                let result = if let Some(e) = value.to_member("error").or_fail()?.get() {
+                let result = if let Some(e) = object.get_optional("error") {
                     Err(e.extract().into_owned())
                 } else {
-                    let result = value.to_member("result").or_fail()?.required().or_fail()?;
+                    let result = object.get_required("result").or_fail()?;
                     Ok(result.extract().into_owned())
                 };
                 LspMessage::ResponseFromLspServer { request_id, result }

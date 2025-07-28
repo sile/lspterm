@@ -37,11 +37,8 @@ impl<'text, 'raw> JsonObject<'text, 'raw> {
         self.get_required(name)?.try_into()
     }
 
-    pub fn get_optional(
-        &self,
-        name: &str,
-    ) -> Result<Option<nojson::RawJsonValue<'text, 'raw>>, nojson::JsonParseError> {
-        Ok(self.0.to_member(name)?.get())
+    pub fn get_optional(&self, name: &str) -> Option<nojson::RawJsonValue<'text, 'raw>> {
+        self.0.to_member(name).expect("bug").get()
     }
 
     pub fn convert_optional<T>(&self, name: &str) -> Result<Option<T>, nojson::JsonParseError>
