@@ -55,7 +55,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     // Check if there's an error in the response
     if let Some(error) = response_value.to_member("error").or_fail()?.get() {
-        eprintln!("LSP server returned error: {}", error);
+        eprintln!("LSP server returned error: {error}");
         return Ok(None);
     }
 
@@ -65,7 +65,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .or_fail()?
         .required()
         .or_fail()?;
-    println!("{}", result);
+    println!("{result}");
 
     Ok(None)
 }

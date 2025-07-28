@@ -63,7 +63,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     // Check if there's an error in the response
     if let Some(error) = response_value.to_member("error").or_fail()?.get() {
-        eprintln!("LSP server returned error: {}", error);
+        eprintln!("LSP server returned error: {error}");
         return Ok(None);
     }
 
@@ -73,7 +73,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .or_fail()?
         .required()
         .or_fail()?;
-    println!("{}", result);
+    println!("{result}");
 
     if apply {
         apply_workspace_edit(result).or_fail()?;
@@ -168,7 +168,7 @@ fn apply_workspace_edit(result: nojson::RawJsonValue) -> orfail::Result<()> {
         let file_path = if let Some(path) = uri.strip_prefix("file://") {
             PathBuf::from(path)
         } else {
-            return Err(orfail::Failure::new(format!("Invalid URI format: {}", uri)));
+            return Err(orfail::Failure::new(format!("Invalid URI format: {uri}")));
         };
 
         // Read file content

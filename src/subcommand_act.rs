@@ -93,7 +93,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     // Check if there's an error in the response
     if let Some(error) = response_value.to_member("error").or_fail()?.get() {
-        eprintln!("LSP server returned error: {}", error);
+        eprintln!("LSP server returned error: {error}");
         return Ok(None);
     }
 
@@ -156,7 +156,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
                 }
 
                 if let Err(e) = execute_code_action(&mut stream, request_id + 1, selected_action) {
-                    eprintln!("Failed to execute code action: {}", e);
+                    eprintln!("Failed to execute code action: {e}");
                 }
             } else {
                 eprintln!(
@@ -167,7 +167,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
             }
         }
     } else {
-        println!("{}", result);
+        println!("{result}");
     }
 
     Ok(None)
@@ -182,28 +182,28 @@ fn resolve_code_action(
         stream.get_mut(),
         request_id,
         "codeAction/resolve",
-        action.clone(),
+        *action,
     )
-    .map_err(|e| format!("Failed to send resolve request: {}", e))?;
+    .map_err(|e| format!("Failed to send resolve request: {e}"))?;
 
     let response_json = lsp::recv_message(stream)
-        .map_err(|e| format!("Failed to receive resolve response: {}", e))?
-        .ok_or_else(|| "unexpected EOS")?;
+        .map_err(|e| format!("Failed to receive resolve response: {e}"))?
+        .ok_or("unexpected EOS")?;
     let response_value = response_json.value();
 
     if let Some(error) = response_value
         .to_member("error")
-        .map_err(|e| format!("Invalid response format: {}", e))?
+        .map_err(|e| format!("Invalid response format: {e}"))?
         .get()
     {
-        return Err(format!("Failed to resolve code action: {}", error).into());
+        return Err(format!("Failed to resolve code action: {error}").into());
     }
 
     let result = response_value
         .to_member("result")
-        .map_err(|e| format!("Invalid response format: {}", e))?
+        .map_err(|e| format!("Invalid response format: {e}"))?
         .required()
-        .map_err(|e| format!("Missing result in response: {}", e))?;
+        .map_err(|e| format!("Missing result in response: {e}"))?;
 
     Ok(result.extract().into_owned())
 }
@@ -215,11 +215,11 @@ fn apply_workspace_edit(edit: &nojson::RawJsonValue) -> Result<(), Box<dyn std::
     // Parse documentChanges array
     let document_changes = edit
         .to_member("documentChanges")
-        .map_err(|e| format!("Invalid edit format: {}", e))?
+        .map_err(|e| format!("Invalid edit format: {e}"))?
         .required()
-        .map_err(|e| format!("Missing documentChanges: {}", e))?
+        .map_err(|e| format!("Missing documentChanges: {e}"))?
         .to_array()
-        .map_err(|e| format!("Invalid documentChanges format: {}", e))?;
+        .map_err(|e| format!("Invalid documentChanges format: {e}"))?;
 
     // Group edits by file
     let mut files_to_edit: HashMap<String, Vec<_>> = HashMap::new();
@@ -227,82 +227,82 @@ fn apply_workspace_edit(edit: &nojson::RawJsonValue) -> Result<(), Box<dyn std::
     for change in document_changes {
         let text_document = change
             .to_member("textDocument")
-            .map_err(|e| format!("Invalid change format: {}", e))?
+            .map_err(|e| format!("Invalid change format: {e}"))?
             .required()
-            .map_err(|e| format!("Missing textDocument: {}", e))?;
+            .map_err(|e| format!("Missing textDocument: {e}"))?;
 
         let uri = text_document
             .to_member("uri")
-            .map_err(|e| format!("Invalid textDocument format: {}", e))?
+            .map_err(|e| format!("Invalid textDocument format: {e}"))?
             .required()
-            .map_err(|e| format!("Missing uri: {}", e))?
+            .map_err(|e| format!("Missing uri: {e}"))?
             .to_unquoted_string_str()
-            .map_err(|e| format!("Invalid uri format: {}", e))?;
+            .map_err(|e| format!("Invalid uri format: {e}"))?;
 
         let edits = change
             .to_member("edits")
-            .map_err(|e| format!("Invalid change format: {}", e))?
+            .map_err(|e| format!("Invalid change format: {e}"))?
             .required()
-            .map_err(|e| format!("Missing edits: {}", e))?
+            .map_err(|e| format!("Missing edits: {e}"))?
             .to_array()
-            .map_err(|e| format!("Invalid edits format: {}", e))?;
+            .map_err(|e| format!("Invalid edits format: {e}"))?;
 
         for edit in edits {
             let range = edit
                 .to_member("range")
-                .map_err(|e| format!("Invalid edit format: {}", e))?
+                .map_err(|e| format!("Invalid edit format: {e}"))?
                 .required()
-                .map_err(|e| format!("Missing range: {}", e))?;
+                .map_err(|e| format!("Missing range: {e}"))?;
 
             let start = range
                 .to_member("start")
-                .map_err(|e| format!("Invalid range format: {}", e))?
+                .map_err(|e| format!("Invalid range format: {e}"))?
                 .required()
-                .map_err(|e| format!("Missing start: {}", e))?;
+                .map_err(|e| format!("Missing start: {e}"))?;
             let start_line = usize::try_from(
                 start
                     .to_member("line")
-                    .map_err(|e| format!("Invalid start format: {}", e))?
+                    .map_err(|e| format!("Invalid start format: {e}"))?
                     .required()
-                    .map_err(|e| format!("Missing line: {}", e))?,
+                    .map_err(|e| format!("Missing line: {e}"))?,
             )
-            .map_err(|e| format!("Invalid line number: {}", e))?;
+            .map_err(|e| format!("Invalid line number: {e}"))?;
             let start_char = usize::try_from(
                 start
                     .to_member("character")
-                    .map_err(|e| format!("Invalid start format: {}", e))?
+                    .map_err(|e| format!("Invalid start format: {e}"))?
                     .required()
-                    .map_err(|e| format!("Missing character: {}", e))?,
+                    .map_err(|e| format!("Missing character: {e}"))?,
             )
-            .map_err(|e| format!("Invalid character number: {}", e))?;
+            .map_err(|e| format!("Invalid character number: {e}"))?;
 
             let end = range
                 .to_member("end")
-                .map_err(|e| format!("Invalid range format: {}", e))?
+                .map_err(|e| format!("Invalid range format: {e}"))?
                 .required()
-                .map_err(|e| format!("Missing end: {}", e))?;
+                .map_err(|e| format!("Missing end: {e}"))?;
             let end_line = usize::try_from(
                 end.to_member("line")
-                    .map_err(|e| format!("Invalid end format: {}", e))?
+                    .map_err(|e| format!("Invalid end format: {e}"))?
                     .required()
-                    .map_err(|e| format!("Missing line: {}", e))?,
+                    .map_err(|e| format!("Missing line: {e}"))?,
             )
-            .map_err(|e| format!("Invalid line number: {}", e))?;
+            .map_err(|e| format!("Invalid line number: {e}"))?;
             let end_char = usize::try_from(
                 end.to_member("character")
-                    .map_err(|e| format!("Invalid end format: {}", e))?
+                    .map_err(|e| format!("Invalid end format: {e}"))?
                     .required()
-                    .map_err(|e| format!("Missing character: {}", e))?,
+                    .map_err(|e| format!("Missing character: {e}"))?,
             )
-            .map_err(|e| format!("Invalid character number: {}", e))?;
+            .map_err(|e| format!("Invalid character number: {e}"))?;
 
             let new_text = edit
                 .to_member("newText")
-                .map_err(|e| format!("Invalid edit format: {}", e))?
+                .map_err(|e| format!("Invalid edit format: {e}"))?
                 .required()
-                .map_err(|e| format!("Missing newText: {}", e))?
+                .map_err(|e| format!("Missing newText: {e}"))?
                 .to_unquoted_string_str()
-                .map_err(|e| format!("Invalid newText format: {}", e))?;
+                .map_err(|e| format!("Invalid newText format: {e}"))?;
 
             files_to_edit.entry(uri.to_string()).or_default().push((
                 start_line,
@@ -320,7 +320,7 @@ fn apply_workspace_edit(edit: &nojson::RawJsonValue) -> Result<(), Box<dyn std::
         let file_path = if let Some(path) = uri.strip_prefix("file://") {
             std::path::PathBuf::from(path)
         } else {
-            return Err(format!("Invalid URI format: {}", uri).into());
+            return Err(format!("Invalid URI format: {uri}").into());
         };
 
         // Read file content
@@ -395,21 +395,21 @@ fn execute_command(
         stream.get_mut(),
         request_id,
         "workspace/executeCommand",
-        command.clone(),
+        *command,
     )
-    .map_err(|e| format!("Failed to send execute command request: {}", e))?;
+    .map_err(|e| format!("Failed to send execute command request: {e}"))?;
 
     let response_json = lsp::recv_message(stream)
-        .map_err(|e| format!("Failed to receive execute command response: {}", e))?
-        .ok_or_else(|| "unexpected EOS")?;
+        .map_err(|e| format!("Failed to receive execute command response: {e}"))?
+        .ok_or("unexpected EOS")?;
     let response_value = response_json.value();
 
     if let Some(error) = response_value
         .to_member("error")
-        .map_err(|e| format!("Invalid response format: {}", e))?
+        .map_err(|e| format!("Invalid response format: {e}"))?
         .get()
     {
-        return Err(format!("Failed to execute command: {}", error).into());
+        return Err(format!("Failed to execute command: {error}").into());
     }
 
     println!("Command executed successfully");
@@ -423,17 +423,17 @@ fn execute_code_action(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let title = action
         .to_member("title")
-        .map_err(|e| format!("Invalid action format: {}", e))?
+        .map_err(|e| format!("Invalid action format: {e}"))?
         .get()
         .and_then(|t| t.to_unquoted_string_str().ok())
         .unwrap_or(Cow::Borrowed("Unknown"));
 
-    println!("Executing code action: {}", title);
+    println!("Executing code action: {title}");
 
     // Check if the action needs to be resolved first
     let resolved_action = if action
         .to_member("data")
-        .map_err(|e| format!("Invalid action format: {}", e))?
+        .map_err(|e| format!("Invalid action format: {e}"))?
         .get()
         .is_some()
     {
@@ -449,7 +449,7 @@ fn execute_code_action(
     // Execute the edit if present
     if let Some(edit) = resolved_value
         .to_member("edit")
-        .map_err(|e| format!("Invalid resolved action format: {}", e))?
+        .map_err(|e| format!("Invalid resolved action format: {e}"))?
         .get()
     {
         request_id += 1;
@@ -459,7 +459,7 @@ fn execute_code_action(
     // Execute the command if present
     if let Some(command) = resolved_value
         .to_member("command")
-        .map_err(|e| format!("Invalid resolved action format: {}", e))?
+        .map_err(|e| format!("Invalid resolved action format: {e}"))?
         .get()
     {
         request_id += 1;
