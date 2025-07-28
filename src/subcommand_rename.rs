@@ -2,17 +2,25 @@ use std::{io::BufReader, net::TcpStream, path::PathBuf};
 
 use orfail::OrFail;
 
-use crate::lsp::{self, DocumentUri};
+use crate::{
+    lsp::{self, DocumentUri},
+    proxy::DEFAULT_PORT,
+};
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
-    if !noargs::cmd("rename").take(&mut args).is_present() {
+    if !noargs::cmd("rename")
+        .doc("TODO")
+        .take(&mut args)
+        .is_present()
+    {
         return Ok(Some(args));
     }
 
     let port: u16 = noargs::opt("port")
         .short('p')
-        .default("9257")
+        .default(DEFAULT_PORT)
         .env("LSPTERM_PORT")
+        .doc("Port number of the LSP proxy server to connect to")
         .take(&mut args)
         .then(|a| a.value().parse())?;
     let apply = noargs::flag("apply")
