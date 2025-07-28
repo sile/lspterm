@@ -15,22 +15,24 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     let target: TargetLocation = noargs::opt("target-location")
         .short('t')
+        .ty("FILE[:LINE[:CHARACTER]]")
         .env("LSPTERM_TARGET_LOCATION")
         .example("/path/to/file:0:5")
-        .doc("Target location for rename in format FILE[:LINE[:CHARACTER]]")
-        .take(&mut args)
-        .then(|a| a.value().parse())?;
-    let port: u16 = noargs::opt("port")
-        .short('p')
-        .default(DEFAULT_PORT)
-        .env("LSPTERM_PORT")
-        .doc("Port number of the LSP proxy server to connect to")
+        .doc("Target location for rename")
         .take(&mut args)
         .then(|a| a.value().parse())?;
     let apply = noargs::flag("apply")
         .short('a')
         .take(&mut args)
         .is_present();
+    let port: u16 = noargs::opt("port")
+        .short('p')
+        .ty("INTEGER")
+        .default(DEFAULT_PORT)
+        .env("LSPTERM_PORT")
+        .doc("Port number of the LSP proxy server to connect to")
+        .take(&mut args)
+        .then(|a| a.value().parse())?;
     let new_name: String = noargs::arg("NEW_NAME")
         .example("new-name")
         .take(&mut args)

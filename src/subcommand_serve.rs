@@ -19,11 +19,13 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
 
     let workspace_folder: Option<PathBuf> = noargs::opt("workspace-folder")
         .short('w')
+        .ty("DIRECTORY_PATH")
         .doc("Path to workspace folder (defaults to current directory)")
         .take(&mut raw_args)
         .present_and_then(|a| a.value().parse())?;
     let port: u16 = noargs::opt("port")
         .short('p')
+        .ty("INTEGER")
         .default(DEFAULT_PORT)
         .doc("Port number to bind the proxy server to")
         .env("LSPTERM_PORT")
@@ -31,6 +33,7 @@ pub fn try_run(mut raw_args: noargs::RawArgs) -> noargs::Result<Option<noargs::R
         .then(|a| a.value().parse())?;
     let lsp_server_config_file_path: PathBuf = noargs::opt("lsp-server-config-file")
         .short('c')
+        .ty("PATH")
         .doc("Path to JSON configuration file specifying the LSP server command and options")
         .example("/path/to/config.json")
         .env("LSPTERM_LSP_SERVER_CONFIG_FILE")
