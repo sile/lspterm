@@ -33,6 +33,13 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let character = noargs::arg("CHARACTER")
         .take(&mut args)
         .then(|a| a.value().parse::<u32>())?;
+    let marker: String = noargs::opt("marker")
+        .short('m')
+        .default("!!")
+        .env("LSPTERM_MARKER")
+        .doc("TODO")
+        .take(&mut args)
+        .then(|a| a.value().parse())?;
     let new_name: String = noargs::arg("NEW_NAME")
         .take(&mut args)
         .then(|a| a.value().parse())?;
