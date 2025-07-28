@@ -7,6 +7,7 @@ use std::{
 use orfail::OrFail;
 
 use crate::{
+    json::JsonObject,
     lsp::{self, DocumentUri},
     lsp_server::{LspMessage, LspServer, LspServerSpec},
 };
@@ -31,7 +32,6 @@ impl ProxyServer {
         Self { config }
     }
 
-    /// Start the proxy server and listen for incoming connections
     pub fn run(self) -> orfail::Result<()> {
         let listener = TcpListener::bind(("127.0.0.1", self.config.port)).or_fail()?;
 
@@ -60,21 +60,10 @@ impl ProxyServer {
 fn run_proxy_client(stream: TcpStream, msg_tx: Sender<LspMessage>) -> orfail::Result<()> {
     let mut stream = BufReader::new(stream);
     while let Some(json) = lsp::recv_message(&mut stream).or_fail()? {
-        let value = json.value();
-        let method = value
-            .to_member("method")
-            .or_fail()?
-            .required()
-            .or_fail()?
-            .to_unquoted_string_str()
-            .or_fail()?
-            .into_owned();
-        let params = value
-            .to_member("params")
-            .or_fail()?
-            .map(|v| Ok(v.extract().into_owned()))
-            .or_fail()?;
-        let id = value.to_member("id").or_fail()?.get();
+        let object = JsonObject::new(json.value()).or_fail()?;
+        let method = object.convert_required("method").or_fail()?;
+        let params = object.convert_optional("params").or_fail()?;
+        let id = object.get_optional("id");
         let (msg, id_and_reply_rx) = if let Some(id) = id {
             let (reply_tx, reply_rx) = std::sync::mpsc::channel();
             (
