@@ -24,6 +24,13 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .short('a')
         .take(&mut args)
         .is_present();
+
+    // let target_location = noargs::opt("target-location")
+    // .short('t')
+    // .doc("Target location for rename in format FILE:LINE:CHARACTER")
+    // .take(&mut args)
+    // .then(|a| parse_location(a.value()))?;
+
     let file = noargs::arg("FILE")
         .take(&mut args)
         .then(|a| a.value().parse::<PathBuf>())?;
@@ -33,13 +40,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let character = noargs::arg("CHARACTER")
         .take(&mut args)
         .then(|a| a.value().parse::<u32>())?;
-    let marker: String = noargs::opt("marker")
-        .short('m')
-        .default("!!")
-        .env("LSPTERM_MARKER")
-        .doc("TODO")
-        .take(&mut args)
-        .then(|a| a.value().parse())?;
+
     let new_name: String = noargs::arg("NEW_NAME")
         .take(&mut args)
         .then(|a| a.value().parse())?;

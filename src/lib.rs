@@ -9,3 +9,4 @@ pub mod subcommand_find_def;
 pub mod subcommand_hover;
 pub mod subcommand_rename;
 pub mod subcommand_serve;
+pub mod target;

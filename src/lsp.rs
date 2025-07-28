@@ -127,7 +127,7 @@ fn check_jsonrpc_version(
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DocumentUri(PathBuf);
 
 impl DocumentUri {
