@@ -13,7 +13,6 @@ use crate::{
 
 pub const DEFAULT_PORT: &str = "9257";
 
-/// Configuration for the proxy server
 #[derive(Debug)]
 pub struct ProxyServerConfig {
     pub port: u16,
@@ -22,12 +21,12 @@ pub struct ProxyServerConfig {
 }
 
 /// LSP proxy server that forwards requests to a configured LSP server
+#[derive(Debug)]
 pub struct ProxyServer {
     config: ProxyServerConfig,
 }
 
 impl ProxyServer {
-    /// Create a new proxy server with the given configuration
     pub fn new(config: ProxyServerConfig) -> Self {
         Self { config }
     }
@@ -35,18 +34,16 @@ impl ProxyServer {
     /// Start the proxy server and listen for incoming connections
     pub fn run(self) -> orfail::Result<()> {
         let listener = TcpListener::bind(("127.0.0.1", self.config.port)).or_fail()?;
-        println!("LSP proxy server listening on port {}", self.config.port);
 
         let lsp_server = LspServer::new(
             self.config.lsp_server_spec,
             self.config.workspace_folder_uri,
         )
         .or_fail()?;
-        let lsp_server_msg_tx = lsp_server.message_sender();
 
         for incoming in listener.incoming() {
             let incoming = incoming.or_fail()?;
-            let lsp_server_msg_tx = lsp_server_msg_tx.clone();
+            let lsp_server_msg_tx = lsp_server.message_sender();
             std::thread::spawn(move || {
                 if let Err(e) = run_proxy_client(incoming, lsp_server_msg_tx) {
                     eprintln!("[WARN] failed to run proxy client: {e}");
