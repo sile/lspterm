@@ -31,7 +31,8 @@ impl ProxyClient {
         let response = JsonObject::new(response.value()).or_fail()?;
 
         let id: u32 = response.convert_required("id").or_fail()?;
-        (request_id != id).or_fail()?;
+        (request_id == id)
+            .or_fail_with(|()| format!("expected request id {request_id}, but got {id}"))?;
 
         if let Some(error) = response.get_optional("error") {
             return Err(orfail::Failure::new(format!(
