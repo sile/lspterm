@@ -1,1 +1,1 @@
-# lspterm (or ler)
+# lspterm (or ler or leri)
