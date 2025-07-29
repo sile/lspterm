@@ -5,6 +5,8 @@ use std::{
 
 use orfail::OrFail;
 
+use crate::json::JsonObject;
+
 pub fn send_request<W, T>(
     mut writer: W,
     request_id: u32,
@@ -159,5 +161,67 @@ impl DocumentUri {
 impl nojson::DisplayJson for DocumentUri {
     fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
         f.string(format!("file://{}", self.0.display()))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Position {
+    pub line: usize,
+    pub character: usize,
+}
+
+impl nojson::DisplayJson for Position {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        let indent = f.get_indent_size();
+        f.set_indent_size(0);
+        f.object(|f| {
+            f.member("line", self.line)?;
+            f.member("character", self.character)
+        })?;
+        f.set_indent_size(indent);
+        Ok(())
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for Position {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let object = JsonObject::new(value)?;
+        Ok(Self {
+            line: object.convert_required("line")?,
+            character: object.convert_required("character")?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PositionRange {
+    pub start: Position,
+    pub end: Position,
+}
+
+impl nojson::DisplayJson for PositionRange {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        let indent = f.get_indent_size();
+        f.set_indent_size(0);
+        f.object(|f| {
+            f.member("start", &self.start)?;
+            f.member("end", &self.end)
+        })?;
+        f.set_indent_size(indent);
+        Ok(())
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for PositionRange {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let object = JsonObject::new(value)?;
+        Ok(Self {
+            start: object.convert_required("start")?,
+            end: object.convert_required("end")?,
+        })
     }
 }

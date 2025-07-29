@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use orfail::OrFail;
 
+use crate::lsp::PositionRange;
+
 #[derive(Debug, Clone)]
 pub struct DocumentChanges {
     pub changes: Vec<DocumentChange>,
@@ -21,20 +23,8 @@ pub struct TextDocument {
 
 #[derive(Debug, Clone)]
 pub struct TextEdit {
-    pub range: Range,
+    pub range: PositionRange,
     pub new_text: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct Range {
-    pub start: Position,
-    pub end: Position,
-}
-
-#[derive(Debug, Clone)]
-pub struct Position {
-    pub line: usize,
-    pub character: usize,
 }
 
 impl DocumentChanges {
@@ -56,15 +46,7 @@ impl DocumentChanges {
             let mut edits = Vec::new();
 
             for edit in edits_array {
-                let range = edit.to_member("range")?.required()?;
-
-                let start = range.to_member("start")?.required()?;
-                let start_line = usize::try_from(start.to_member("line")?.required()?)?;
-                let start_char = usize::try_from(start.to_member("character")?.required()?)?;
-
-                let end = range.to_member("end")?.required()?;
-                let end_line = usize::try_from(end.to_member("line")?.required()?)?;
-                let end_char = usize::try_from(end.to_member("character")?.required()?)?;
+                let range = edit.to_member("range")?.required()?.try_into()?;
 
                 let new_text = edit
                     .to_member("newText")?
@@ -72,19 +54,7 @@ impl DocumentChanges {
                     .to_unquoted_string_str()?
                     .to_string();
 
-                edits.push(TextEdit {
-                    range: Range {
-                        start: Position {
-                            line: start_line,
-                            character: start_char,
-                        },
-                        end: Position {
-                            line: end_line,
-                            character: end_char,
-                        },
-                    },
-                    new_text,
-                });
+                edits.push(TextEdit { range, new_text });
             }
 
             changes.push(DocumentChange {
