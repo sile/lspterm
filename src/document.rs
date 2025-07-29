@@ -49,7 +49,7 @@ impl DocumentChanges {
                 .to_unquoted_string_str()?
                 .to_string();
 
-            let version = text_document.to_member("version")?.map(u32::try_from)?;
+            let version = text_document.to_member("version")?.required()?.try_into()?;
 
             let edits_array = change.to_member("edits")?.required()?.to_array()?;
 
