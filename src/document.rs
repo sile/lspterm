@@ -1,8 +1,9 @@
-use std::path::PathBuf;
-
 use orfail::OrFail;
 
-use crate::lsp::PositionRange;
+use crate::{
+    json::JsonObject,
+    lsp::{DocumentUri, PositionRange},
+};
 
 #[derive(Debug, Clone)]
 pub struct DocumentChanges {
@@ -17,8 +18,28 @@ pub struct DocumentChange {
 
 #[derive(Debug, Clone)]
 pub struct TextDocument {
-    pub uri: String,
+    pub uri: DocumentUri,
     pub version: Option<u32>,
+}
+
+impl nojson::DisplayJson for TextDocument {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        f.object(|f| {
+            f.member("uri", &self.uri)?;
+            f.member("version", self.version)
+        })
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for TextDocument {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let object = JsonObject::new(value)?;
+        let uri = object.convert_required("uri")?;
+        let version = object.convert_required("version")?;
+        Ok(Self { uri, version })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -27,39 +48,35 @@ pub struct TextEdit {
     pub new_text: String,
 }
 
+impl nojson::DisplayJson for TextEdit {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        f.object(|f| {
+            f.member("range", &self.range)?;
+            f.member("newText", &self.new_text)
+        })
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for TextEdit {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let object = JsonObject::new(value)?;
+        let range = object.convert_required("range")?;
+        let new_text = object.convert_required("newText")?;
+        Ok(TextEdit { range, new_text })
+    }
+}
+
 impl DocumentChanges {
     pub fn from_json(value: nojson::RawJsonValue) -> Result<Self, nojson::JsonParseError> {
         let mut changes = Vec::new();
         let document_changes = value.to_member("documentChanges")?.required()?.to_array()?;
         for change in document_changes {
-            let text_document = change.to_member("textDocument")?.required()?;
-            let uri = text_document
-                .to_member("uri")?
-                .required()?
-                .to_unquoted_string_str()?
-                .to_string();
-
-            let version = text_document.to_member("version")?.required()?.try_into()?;
-
-            let edits_array = change.to_member("edits")?.required()?.to_array()?;
-
-            let mut edits = Vec::new();
-
-            for edit in edits_array {
-                let range = edit.to_member("range")?.required()?.try_into()?;
-
-                let new_text = edit
-                    .to_member("newText")?
-                    .required()?
-                    .to_unquoted_string_str()?
-                    .to_string();
-
-                edits.push(TextEdit { range, new_text });
-            }
-
+            let text_document = change.to_member("textDocument")?.required()?.try_into()?;
             changes.push(DocumentChange {
-                text_document: TextDocument { uri, version },
-                edits,
+                text_document,
+                edits: change.to_member("edits")?.required()?.try_into()?,
             });
         }
 
@@ -71,7 +88,7 @@ impl DocumentChanges {
         use std::fs;
 
         // Group edits by file
-        let mut files_to_edit: HashMap<String, Vec<&TextEdit>> = HashMap::new();
+        let mut files_to_edit: HashMap<DocumentUri, Vec<&TextEdit>> = HashMap::new();
 
         for change in &self.changes {
             for edit in &change.edits {
@@ -85,11 +102,7 @@ impl DocumentChanges {
         // Apply edits to each file
         for (uri, mut edits) in files_to_edit {
             // Convert file:// URI to path
-            let file_path = if let Some(path) = uri.strip_prefix("file://") {
-                PathBuf::from(path)
-            } else {
-                return Err(orfail::Failure::new(format!("Invalid URI format: {uri}")));
-            };
+            let file_path = uri.path();
 
             // Read file content
             let content = fs::read_to_string(&file_path).or_fail_with(|e| {

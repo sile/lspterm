@@ -129,7 +129,7 @@ fn check_jsonrpc_version(
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DocumentUri(PathBuf);
 
 impl DocumentUri {
@@ -150,6 +150,10 @@ impl DocumentUri {
             .or_fail_with(|e| format!("failed to read file '{}': {e}", self.0.display()))
     }
 
+    pub fn path(&self) -> &Path {
+        &self.0
+    }
+
     pub fn check_existence(&self) -> orfail::Result<()> {
         self.0
             .exists()
@@ -161,6 +165,19 @@ impl DocumentUri {
 impl nojson::DisplayJson for DocumentUri {
     fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
         f.string(format!("file://{}", self.0.display()))
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentUri {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let uri_string = value.to_unquoted_string_str()?;
+        if let Some(path_str) = uri_string.strip_prefix("file://") {
+            Ok(Self(PathBuf::from(path_str)))
+        } else {
+            Err(value.invalid("URI must start with 'file://'"))
+        }
     }
 }
 
