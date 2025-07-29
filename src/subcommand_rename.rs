@@ -21,6 +21,11 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .doc("Target location for rename")
         .take(&mut args)
         .then(|a| a.value().parse())?;
+    let diff = noargs::flag("diff")
+        .short('d')
+        .doc("Print the output in diff format")
+        .take(&mut args)
+        .is_present();
     let apply = noargs::flag("apply")
         .short('a')
         .take(&mut args)
@@ -51,7 +56,11 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         f.member("newName", &new_name)
     });
     let result = client.call("textDocument/rename", params).or_fail()?;
-    println!("{result}");
+    if diff {
+        todo!()
+    } else {
+        println!("{result}");
+    }
 
     if apply {
         apply_workspace_edit(result.value()).or_fail()?;
