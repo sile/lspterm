@@ -10,10 +10,49 @@ pub struct DocumentChanges {
     pub changes: Vec<DocumentChange>,
 }
 
+impl nojson::DisplayJson for DocumentChanges {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        f.object(|f| f.member("documentChanges", &self.changes))
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentChanges {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let object = JsonObject::new(value)?;
+        let changes = object.convert_required("documentChanges")?;
+        Ok(Self { changes })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DocumentChange {
     pub text_document: TextDocument,
     pub edits: Vec<TextEdit>,
+}
+
+impl nojson::DisplayJson for DocumentChange {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        f.object(|f| {
+            f.member("textDocument", &self.text_document)?;
+            f.member("edits", &self.edits)
+        })
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentChange {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let object = JsonObject::new(value)?;
+        let text_document = object.convert_required("textDocument")?;
+        let edits = object.convert_required("edits")?;
+        Ok(Self {
+            text_document,
+            edits,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,20 +108,6 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for TextEdit {
 }
 
 impl DocumentChanges {
-    pub fn from_json(value: nojson::RawJsonValue) -> Result<Self, nojson::JsonParseError> {
-        let mut changes = Vec::new();
-        let document_changes = value.to_member("documentChanges")?.required()?.to_array()?;
-        for change in document_changes {
-            let text_document = change.to_member("textDocument")?.required()?.try_into()?;
-            changes.push(DocumentChange {
-                text_document,
-                edits: change.to_member("edits")?.required()?.try_into()?,
-            });
-        }
-
-        Ok(DocumentChanges { changes })
-    }
-
     pub fn apply(&self) -> orfail::Result<()> {
         use std::collections::HashMap;
         use std::fs;
