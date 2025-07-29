@@ -1,3 +1,4 @@
+pub mod document;
 pub mod json;
 pub mod lsp;
 pub mod lsp_server;
