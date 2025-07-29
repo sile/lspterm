@@ -22,11 +22,6 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .doc("Target location for rename")
         .take(&mut args)
         .then(|a| a.value().parse())?;
-    let diff = noargs::flag("diff")
-        .short('d')
-        .doc("Print the output in diff format")
-        .take(&mut args)
-        .is_present();
     let apply = noargs::flag("apply")
         .short('a')
         .take(&mut args)
@@ -57,11 +52,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         f.member("newName", &new_name)
     });
     let result = client.call("textDocument/rename", params).or_fail()?;
-    if diff {
-        todo!()
-    } else {
-        println!("{result}");
-    }
+    println!("{result}");
 
     if apply {
         let document_changes = DocumentChanges::from_json(result.value())

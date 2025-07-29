@@ -1,10 +1,12 @@
+use std::num::NonZeroUsize;
+
 use crate::lsp::DocumentUri;
 
 #[derive(Debug, Clone)]
 pub struct TargetLocation {
     pub file: DocumentUri,
-    pub line: usize,
-    pub character: usize,
+    pub line: NonZeroUsize,
+    pub character: NonZeroUsize,
 }
 
 impl TargetLocation {
@@ -19,8 +21,8 @@ impl TargetLocation {
         f.member(
             "position",
             nojson::object(|f| {
-                f.member("line", self.line)?;
-                f.member("character", self.character)
+                f.member("line", self.line.get() - 1)?;
+                f.member("character", self.character.get() - 1)
             }),
         )?;
         Ok(())
@@ -38,13 +40,13 @@ impl std::str::FromStr for TargetLocation {
             .map_err(|e| format!("invalid file path '{file}': {}", e.message))?;
 
         let line_str = tokens.next().unwrap_or("0");
-        let line = line_str.parse::<usize>().map_err(|_| {
-            format!("invalid line number '{line_str}': must be a non-negative integer")
-        })?;
+        let line = line_str
+            .parse::<NonZeroUsize>()
+            .map_err(|_| format!("invalid line number '{line_str}': must be a positive integer"))?;
 
         let character_str = tokens.next().unwrap_or("0");
-        let character = character_str.parse::<usize>().map_err(|_| {
-            format!("invalid column number '{character_str}': must be a non-negative integer")
+        let character = character_str.parse::<NonZeroUsize>().map_err(|_| {
+            format!("invalid column number '{character_str}': must be a positive integer")
         })?;
 
         Ok(Self {
