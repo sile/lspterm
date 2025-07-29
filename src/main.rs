@@ -33,8 +33,6 @@ fn main() -> noargs::Result<()> {
         return Ok(());
     };
 
-    // TODO: process, take-maker
-
     // MEMO:
     // - textDocument/references
     // - textDocument/documentSymbol
