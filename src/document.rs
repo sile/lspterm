@@ -21,18 +21,45 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentChanges
 
     fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
         let object = JsonObject::new(value)?;
-        let changes = object.convert_required("documentChanges")?;
+        let changes_array = object.get_required("documentChanges")?;
+        let mut changes = Vec::new();
+
+        for item in changes_array.to_array()? {
+            // Try to parse as different types of document changes
+            if let Ok(text_change) = TextDocumentChange::try_from(item) {
+                changes.push(DocumentChange::TextDocument(text_change));
+            } else if let Ok(rename_change) = RenameFileChange::try_from(item) {
+                changes.push(DocumentChange::RenameFile(rename_change));
+            }
+            // Silently skip unknown change types for forward compatibility
+        }
+
         Ok(Self { changes })
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct DocumentChange {
+pub enum DocumentChange {
+    TextDocument(TextDocumentChange),
+    RenameFile(RenameFileChange),
+}
+
+impl nojson::DisplayJson for DocumentChange {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        match self {
+            DocumentChange::TextDocument(change) => change.fmt(f),
+            DocumentChange::RenameFile(change) => change.fmt(f),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TextDocumentChange {
     pub text_document: TextDocument,
     pub edits: Vec<TextEdit>,
 }
 
-impl nojson::DisplayJson for DocumentChange {
+impl nojson::DisplayJson for TextDocumentChange {
     fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
         f.object(|f| {
             f.member("textDocument", &self.text_document)?;
@@ -41,7 +68,7 @@ impl nojson::DisplayJson for DocumentChange {
     }
 }
 
-impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentChange {
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for TextDocumentChange {
     type Error = nojson::JsonParseError;
 
     fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
@@ -51,6 +78,39 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentChange 
         Ok(Self {
             text_document,
             edits,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RenameFileChange {
+    pub kind: String,
+    pub old_uri: DocumentUri,
+    pub new_uri: DocumentUri,
+}
+
+impl nojson::DisplayJson for RenameFileChange {
+    fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
+        f.object(|f| {
+            f.member("kind", &self.kind)?;
+            f.member("oldUri", &self.old_uri)?;
+            f.member("newUri", &self.new_uri)
+        })
+    }
+}
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for RenameFileChange {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        let object = JsonObject::new(value)?;
+        let kind = object.convert_required("kind")?;
+        let old_uri = object.convert_required("oldUri")?;
+        let new_uri = object.convert_required("newUri")?;
+        Ok(Self {
+            kind,
+            old_uri,
+            new_uri,
         })
     }
 }
@@ -116,11 +176,37 @@ impl DocumentChanges {
         let mut files_to_edit: HashMap<DocumentUri, Vec<&TextEdit>> = HashMap::new();
 
         for change in &self.changes {
-            for edit in &change.edits {
-                files_to_edit
-                    .entry(change.text_document.uri.clone())
-                    .or_default()
-                    .push(edit);
+            match change {
+                DocumentChange::TextDocument(text_change) => {
+                    for edit in &text_change.edits {
+                        files_to_edit
+                            .entry(text_change.text_document.uri.clone())
+                            .or_default()
+                            .push(edit);
+                    }
+                }
+                DocumentChange::RenameFile(rename_change) => {
+                    // Handle file rename
+                    let old_path = rename_change.old_uri.path();
+                    let new_path = rename_change.new_uri.path();
+
+                    if let Some(parent) = new_path.parent() {
+                        fs::create_dir_all(parent).or_fail_with(|e| {
+                            format!("Failed to create directory '{}': {}", parent.display(), e)
+                        })?;
+                    }
+
+                    fs::rename(old_path, new_path).or_fail_with(|e| {
+                        format!(
+                            "Failed to rename '{}' to '{}': {}",
+                            old_path.display(),
+                            new_path.display(),
+                            e
+                        )
+                    })?;
+
+                    eprintln!("Renamed: {} -> {}", old_path.display(), new_path.display());
+                }
             }
         }
 

@@ -1,7 +1,7 @@
 use orfail::OrFail;
 
 use crate::{
-    document::{DocumentChanges, TextEdit},
+    document::{DocumentChange, DocumentChanges, TextEdit},
     proxy_client::ProxyClient,
     proxy_server::DEFAULT_PORT,
     target::TargetLocation,
@@ -9,7 +9,7 @@ use crate::{
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("rename")
-        .doc("TODO")
+        .doc("Rename symbol using LSP")
         .take(&mut args)
         .is_present()
     {
@@ -86,20 +86,38 @@ fn fmt_document_changes(
     let base_dir = std::env::current_dir().unwrap_or_default();
     f.object(|f| {
         for change in &document_changes.changes {
-            let Ok(text) = change.text_document.uri.read_to_string() else {
-                continue;
-            };
-            let path = change.text_document.uri.relative_path(&base_dir);
-            for edit in &change.edits {
-                f.member(
-                    format!(
-                        "{}:{}:{}",
-                        path.display(),
-                        edit.range.start.line + 1,
-                        edit.range.start.character + 1
-                    ),
-                    nojson::json(|f| fmt_text_edit(f, &text, edit)),
-                )?;
+            match change {
+                DocumentChange::TextDocument(text_change) => {
+                    let Ok(text) = text_change.text_document.uri.read_to_string() else {
+                        continue;
+                    };
+                    let path = text_change.text_document.uri.relative_path(&base_dir);
+                    for edit in &text_change.edits {
+                        f.member(
+                            format!(
+                                "{}:{}:{}",
+                                path.display(),
+                                edit.range.start.line + 1,
+                                edit.range.start.character + 1
+                            ),
+                            nojson::json(|f| fmt_text_edit(f, &text, edit)),
+                        )?;
+                    }
+                }
+                DocumentChange::RenameFile(rename_change) => {
+                    let old_path = rename_change.old_uri.relative_path(&base_dir);
+                    let new_path = rename_change.new_uri.relative_path(&base_dir);
+                    f.member(
+                        format!("rename:{}", old_path.display()),
+                        nojson::json(|f| {
+                            f.object(|f| {
+                                f.member("old_path", old_path.display().to_string())?;
+                                f.member("new_path", new_path.display().to_string())?;
+                                f.member("kind", &rename_change.kind)
+                            })
+                        }),
+                    )?;
+                }
             }
         }
         Ok(())
