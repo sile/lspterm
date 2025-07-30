@@ -270,14 +270,12 @@ impl DocumentChanges {
             }
         }
 
-        let new_content = lines.join("\n");
-        let final_content = if content.ends_with('\n') && !new_content.ends_with('\n') {
-            new_content + "\n"
-        } else {
-            new_content
-        };
+        let mut new_content = lines.join("\n");
+        if content.ends_with('\n') && !new_content.ends_with('\n') {
+            new_content.push('\n');
+        }
 
-        Ok(final_content)
+        Ok(new_content)
     }
 
     fn apply_rename_files_changes(&self) -> orfail::Result<()> {
