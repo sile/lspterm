@@ -190,20 +190,22 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for TextEdit {
 
 impl DocumentChanges {
     pub fn apply(&self) -> orfail::Result<()> {
+        self.apply_text_document_changes().or_fail()?;
+        self.apply_rename_files_changes().or_fail()?;
+        Ok(())
+    }
+
+    fn apply_text_document_changes(&self) -> orfail::Result<()> {
         // Group edits by file
         let mut files_to_edit: HashMap<DocumentUri, Vec<&TextEdit>> = HashMap::new();
-
         for change in &self.changes {
-            match change {
-                DocumentChange::TextDocument(text_change) => {
-                    for edit in &text_change.edits {
-                        files_to_edit
-                            .entry(text_change.text_document.uri.clone())
-                            .or_default()
-                            .push(edit);
-                    }
+            if let DocumentChange::TextDocument(change) = change {
+                for edit in &change.edits {
+                    files_to_edit
+                        .entry(change.text_document.uri.clone())
+                        .or_default()
+                        .push(edit);
                 }
-                DocumentChange::RenameFile(rename_change) => rename_change.apply().or_fail()?,
             }
         }
 
@@ -217,66 +219,73 @@ impl DocumentChanges {
                 format!("Failed to read file '{}': {}", file_path.display(), e)
             })?;
 
-            let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-
             // Sort edits by position (end to start) to avoid offset issues
-            edits.sort_by(|a, b| match b.range.start.line.cmp(&a.range.start.line) {
-                std::cmp::Ordering::Equal => b.range.start.character.cmp(&a.range.start.character),
-                other => other,
-            });
+            edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
 
-            // Apply edits
-            for edit in edits {
-                let start_line = edit.range.start.line;
-                let start_char = edit.range.start.character;
-                let end_line = edit.range.end.line;
-                let end_char = edit.range.end.character;
+            let applied_content = self.apply_edits(&content, &edits).or_fail()?;
+            std::fs::write(&file_path, applied_content)
+                .or_fail_with(|e| format!("Failed to write file '{}': {e}", file_path.display()))?;
+        }
 
-                if start_line == end_line {
-                    // Single line edit
-                    if start_line < lines.len() {
-                        let line = &lines[start_line];
-                        let mut chars: Vec<char> = line.chars().collect();
-                        if start_char <= chars.len() && end_char <= chars.len() {
-                            chars.splice(start_char..end_char, edit.new_text.chars());
-                            lines[start_line] = chars.into_iter().collect::<String>();
-                        }
+        Ok(())
+    }
+
+    fn apply_edits(&self, content: &str, edits: &[&TextEdit]) -> orfail::Result<String> {
+        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+        for edit in edits {
+            let start_line = edit.range.start.line;
+            let start_char = edit.range.start.character;
+            let end_line = edit.range.end.line;
+            let end_char = edit.range.end.character;
+
+            if start_line == end_line {
+                // Single line edit
+                if start_line < lines.len() {
+                    let line = &lines[start_line];
+                    let mut chars: Vec<char> = line.chars().collect();
+                    if start_char <= chars.len() && end_char <= chars.len() {
+                        chars.splice(start_char..end_char, edit.new_text.chars());
+                        lines[start_line] = chars.into_iter().collect::<String>();
                     }
-                } else {
-                    // Multi-line edit
-                    if start_line < lines.len() && end_line < lines.len() {
-                        let start_line_content = &lines[start_line];
-                        let end_line_content = &lines[end_line];
+                }
+            } else {
+                // Multi-line edit
+                if start_line < lines.len() && end_line < lines.len() {
+                    let start_line_content = &lines[start_line];
+                    let end_line_content = &lines[end_line];
 
-                        let start_chars: Vec<char> = start_line_content.chars().collect();
-                        let end_chars: Vec<char> = end_line_content.chars().collect();
+                    let start_chars: Vec<char> = start_line_content.chars().collect();
+                    let end_chars: Vec<char> = end_line_content.chars().collect();
 
-                        if start_char <= start_chars.len() && end_char <= end_chars.len() {
-                            let mut new_line = String::new();
-                            new_line
-                                .push_str(&start_chars[..start_char].iter().collect::<String>());
-                            new_line.push_str(&edit.new_text);
-                            new_line.push_str(&end_chars[end_char..].iter().collect::<String>());
+                    if start_char <= start_chars.len() && end_char <= end_chars.len() {
+                        let mut new_line = String::new();
+                        new_line.push_str(&start_chars[..start_char].iter().collect::<String>());
+                        new_line.push_str(&edit.new_text);
+                        new_line.push_str(&end_chars[end_char..].iter().collect::<String>());
 
-                            lines.splice(start_line..=end_line, std::iter::once(new_line));
-                        }
+                        lines.splice(start_line..=end_line, std::iter::once(new_line));
                     }
                 }
             }
-
-            // Write back to file
-            let new_content = lines.join("\n");
-            let final_content = if content.ends_with('\n') && !new_content.ends_with('\n') {
-                new_content + "\n"
-            } else {
-                new_content
-            };
-
-            std::fs::write(&file_path, final_content).or_fail_with(|e| {
-                format!("Failed to write file '{}': {}", file_path.display(), e)
-            })?;
         }
 
+        let new_content = lines.join("\n");
+        let final_content = if content.ends_with('\n') && !new_content.ends_with('\n') {
+            new_content + "\n"
+        } else {
+            new_content
+        };
+
+        Ok(final_content)
+    }
+
+    fn apply_rename_files_changes(&self) -> orfail::Result<()> {
+        for change in &self.changes {
+            if let DocumentChange::RenameFile(change) = change {
+                change.apply().or_fail()?;
+            }
+        }
         Ok(())
     }
 }
