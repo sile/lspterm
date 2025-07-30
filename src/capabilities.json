@@ -3,6 +3,10 @@
     "definition": {
       "linkSupport": true
     },
+    "rename": {
+      "dynamicRegistration": false,
+      "prepareSupport": false
+    },
     "codeAction": {
       "dynamicRegistration": false,
       "codeActionLiteralSupport": {
