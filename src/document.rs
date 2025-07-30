@@ -21,19 +21,16 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentChanges
 
     fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
         let object = JsonObject::new(value)?;
-        let changes_array = object.get_required("documentChanges")?;
         let mut changes = Vec::new();
-
-        for item in changes_array.to_array()? {
-            // Try to parse as different types of document changes
+        for item in object.get_required("documentChanges")?.to_array()? {
             if let Ok(text_change) = TextDocumentChange::try_from(item) {
                 changes.push(DocumentChange::TextDocument(text_change));
             } else if let Ok(rename_change) = RenameFileChange::try_from(item) {
                 changes.push(DocumentChange::RenameFile(rename_change));
+            } else {
+                return Err(item.invalid("unknown `documentChanges` entry"));
             }
-            // Silently skip unknown change types for forward compatibility
         }
-
         Ok(Self { changes })
     }
 }
@@ -84,7 +81,6 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for TextDocumentCha
 
 #[derive(Debug, Clone)]
 pub struct RenameFileChange {
-    pub kind: String,
     pub old_uri: DocumentUri,
     pub new_uri: DocumentUri,
 }
@@ -92,7 +88,7 @@ pub struct RenameFileChange {
 impl nojson::DisplayJson for RenameFileChange {
     fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
         f.object(|f| {
-            f.member("kind", &self.kind)?;
+            f.member("kind", "rename")?;
             f.member("oldUri", &self.old_uri)?;
             f.member("newUri", &self.new_uri)
         })
@@ -104,13 +100,13 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for RenameFileChang
 
     fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
         let object = JsonObject::new(value)?;
-        let kind = object.convert_required("kind")?;
-        let old_uri = object.convert_required("oldUri")?;
-        let new_uri = object.convert_required("newUri")?;
+        let kind = object.get_required("kind")?;
+        if kind.to_unquoted_string_str()? != "rename" {
+            return Err(kind.invalid("unsupported kind"));
+        }
         Ok(Self {
-            kind,
-            old_uri,
-            new_uri,
+            old_uri: object.convert_required("oldUri")?,
+            new_uri: object.convert_required("newUri")?,
         })
     }
 }
