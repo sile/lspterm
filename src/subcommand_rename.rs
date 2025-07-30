@@ -109,12 +109,7 @@ fn fmt_document_changes(
                     let new_path = rename_change.new_uri.relative_path(&base_dir);
                     f.member(
                         format!("{}", old_path.display()),
-                        nojson::json(|f| {
-                            f.object(|f| {
-                                f.member("old_path", old_path.display().to_string())?;
-                                f.member("new_path", new_path.display().to_string())
-                            })
-                        }),
+                        nojson::json(|f| f.object(|f| f.member("new_path", &new_path))),
                     )?;
                 }
             }
