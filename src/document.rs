@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use orfail::OrFail;
 
 use crate::{
@@ -85,6 +87,29 @@ pub struct RenameFileChange {
     pub new_uri: DocumentUri,
 }
 
+impl RenameFileChange {
+    fn apply(&self) -> orfail::Result<()> {
+        let old_path = self.old_uri.path();
+        let new_path = self.new_uri.path();
+
+        if let Some(parent) = new_path.parent() {
+            std::fs::create_dir_all(parent).or_fail_with(|e| {
+                format!("Failed to create directory '{}': {e}", parent.display())
+            })?;
+        }
+
+        std::fs::rename(old_path, new_path).or_fail_with(|e| {
+            format!(
+                "Failed to rename '{}' to '{}': {e}",
+                old_path.display(),
+                new_path.display(),
+            )
+        })?;
+
+        Ok(())
+    }
+}
+
 impl nojson::DisplayJson for RenameFileChange {
     fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
         f.object(|f| {
@@ -165,9 +190,6 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for TextEdit {
 
 impl DocumentChanges {
     pub fn apply(&self) -> orfail::Result<()> {
-        use std::collections::HashMap;
-        use std::fs;
-
         // Group edits by file
         let mut files_to_edit: HashMap<DocumentUri, Vec<&TextEdit>> = HashMap::new();
 
@@ -181,28 +203,7 @@ impl DocumentChanges {
                             .push(edit);
                     }
                 }
-                DocumentChange::RenameFile(rename_change) => {
-                    // Handle file rename
-                    let old_path = rename_change.old_uri.path();
-                    let new_path = rename_change.new_uri.path();
-
-                    if let Some(parent) = new_path.parent() {
-                        fs::create_dir_all(parent).or_fail_with(|e| {
-                            format!("Failed to create directory '{}': {}", parent.display(), e)
-                        })?;
-                    }
-
-                    fs::rename(old_path, new_path).or_fail_with(|e| {
-                        format!(
-                            "Failed to rename '{}' to '{}': {}",
-                            old_path.display(),
-                            new_path.display(),
-                            e
-                        )
-                    })?;
-
-                    eprintln!("Renamed: {} -> {}", old_path.display(), new_path.display());
-                }
+                DocumentChange::RenameFile(rename_change) => rename_change.apply().or_fail()?,
             }
         }
 
@@ -212,7 +213,7 @@ impl DocumentChanges {
             let file_path = uri.path();
 
             // Read file content
-            let content = fs::read_to_string(&file_path).or_fail_with(|e| {
+            let content = std::fs::read_to_string(&file_path).or_fail_with(|e| {
                 format!("Failed to read file '{}': {}", file_path.display(), e)
             })?;
 
@@ -271,11 +272,9 @@ impl DocumentChanges {
                 new_content
             };
 
-            fs::write(&file_path, final_content).or_fail_with(|e| {
+            std::fs::write(&file_path, final_content).or_fail_with(|e| {
                 format!("Failed to write file '{}': {}", file_path.display(), e)
             })?;
-
-            eprintln!("Applied changes to: {}", file_path.display());
         }
 
         Ok(())

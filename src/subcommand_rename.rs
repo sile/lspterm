@@ -74,6 +74,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     if apply {
         document_changes.apply().or_fail()?;
+        eprintln!("=> Renamed");
     }
 
     Ok(None)
