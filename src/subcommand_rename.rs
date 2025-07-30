@@ -9,26 +9,31 @@ use crate::{
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("rename")
-        .doc("Rename symbol using LSP")
+        .doc("Rename a symbol at the specified location")
         .take(&mut args)
         .is_present()
     {
         return Ok(Some(args));
     }
 
-    let target: TargetLocation = noargs::opt("target-location")
+    let target: TargetLocation = noargs::opt("target")
         .short('t')
-        .ty("FILE[:LINE[:CHARACTER]]")
-        .env("LSPTERM_TARGET_LOCATION")
-        .example("/path/to/file:0:5")
+        .ty("FILE[:LINE[:CHAR]]")
+        .env("LSPTERM_TARGET")
+        .example("/path/to/file:1:5")
         .doc("Target location for rename")
         .take(&mut args)
         .then(|a| a.value().parse())?;
     let apply = noargs::flag("apply")
         .short('a')
+        .doc("Apply the rename changes to files instead of just displaying them")
         .take(&mut args)
         .is_present();
-    let raw = noargs::flag("raw").short('r').take(&mut args).is_present();
+    let raw = noargs::flag("raw")
+        .short('r')
+        .doc("Output raw JSON response from LSP server instead of formatted changes")
+        .take(&mut args)
+        .is_present();
     let port: u16 = noargs::opt("port")
         .short('p')
         .ty("INTEGER")
@@ -38,6 +43,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .take(&mut args)
         .then(|a| a.value().parse())?;
     let new_name: String = noargs::arg("NEW_NAME")
+        .doc("New name for the symbol being renamed")
         .example("new-name")
         .take(&mut args)
         .then(|a| a.value().parse())?;
