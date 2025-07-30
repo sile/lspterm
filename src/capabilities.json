@@ -1,11 +1,17 @@
 {
+  "workspace": {
+    "workspaceEdit": {
+      "documentChanges": true,
+      "resourceOperations": [
+        "create",
+        "rename",
+        "delete"
+      ]
+    }
+  },
   "textDocument": {
     "definition": {
       "linkSupport": true
-    },
-    "rename": {
-      "dynamicRegistration": false,
-      "prepareSupport": false
     },
     "codeAction": {
       "dynamicRegistration": false,

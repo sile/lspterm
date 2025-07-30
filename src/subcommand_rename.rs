@@ -55,20 +55,13 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         f.member("newName", &new_name)
     });
     let result = client.call("textDocument/rename", params).or_fail()?;
-    let document_changes = DocumentChanges::try_from(result.value())
-        .or_fail_with(|e| format!("Failed to parse document changes: {}", e))?;
     if raw {
         println!("{result}");
-    } else {
-        // TODO:
-        // println!(
-        //     "{}",
-        //     nojson::json(|f| {
-        //         f.set_indent_size(2);
-        //         f.set_spacing(true);
-        //         f.value(&document_changes)
-        //     })
-        // );
+    }
+
+    let document_changes = DocumentChanges::try_from(result.value())
+        .or_fail_with(|e| format!("Failed to parse document changes: {}", e))?;
+    if !raw {
         println!(
             "{}",
             nojson::json(|f| {
