@@ -1,7 +1,9 @@
 use orfail::OrFail;
 
 use crate::{
-    document::DocumentChanges, proxy_client::ProxyClient, proxy_server::DEFAULT_PORT,
+    document::{DocumentChanges, TextEdit},
+    proxy_client::ProxyClient,
+    proxy_server::DEFAULT_PORT,
     target::TargetLocation,
 };
 
@@ -58,12 +60,21 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     if raw {
         println!("{result}");
     } else {
+        // TODO:
+        // println!(
+        //     "{}",
+        //     nojson::json(|f| {
+        //         f.set_indent_size(2);
+        //         f.set_spacing(true);
+        //         f.value(&document_changes)
+        //     })
+        // );
         println!(
             "{}",
             nojson::json(|f| {
                 f.set_indent_size(2);
                 f.set_spacing(true);
-                f.value(&document_changes)
+                fmt_document_changes(f, &document_changes)
             })
         );
     }
@@ -73,4 +84,55 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     }
 
     Ok(None)
+}
+
+fn fmt_document_changes(
+    f: &mut nojson::JsonFormatter<'_, '_>,
+    document_changes: &DocumentChanges,
+) -> std::fmt::Result {
+    let base_dir = std::env::current_dir().unwrap_or_default();
+    f.object(|f| {
+        for change in &document_changes.changes {
+            let Ok(text) = change.text_document.uri.read_to_string() else {
+                continue;
+            };
+            let path = change.text_document.uri.relative_path(&base_dir);
+            for edit in &change.edits {
+                f.member(
+                    format!(
+                        "{}:{}:{}",
+                        path.display(),
+                        edit.range.start.line + 1,
+                        edit.range.start.character + 1
+                    ),
+                    nojson::json(|f| fmt_text_edit(f, &text, edit)),
+                )?;
+            }
+        }
+        Ok(())
+    })
+}
+
+fn fmt_text_edit(
+    f: &mut nojson::JsonFormatter<'_, '_>,
+    text: &str,
+    edit: &TextEdit,
+) -> std::fmt::Result {
+    if edit.range.is_multiline() {
+        todo!();
+    }
+
+    let old_line = edit.range.get_start_line(text).unwrap_or_default();
+    let new_line = old_line
+        .chars()
+        .take(edit.range.start.character)
+        .chain(edit.new_text.chars())
+        .chain(old_line.chars().skip(edit.range.end.character))
+        .collect::<String>();
+
+    f.object(|f| {
+        f.member("old_line", old_line)?;
+        f.member("new_line", &new_line)?;
+        Ok(())
+    })
 }

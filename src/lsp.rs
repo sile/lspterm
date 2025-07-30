@@ -154,6 +154,13 @@ impl DocumentUri {
         &self.0
     }
 
+    pub fn relative_path<P: AsRef<Path>>(&self, base_dir: P) -> PathBuf {
+        match self.0.strip_prefix(base_dir.as_ref()) {
+            Ok(relative) => relative.to_path_buf(),
+            Err(_) => self.0.clone(),
+        }
+    }
+
     pub fn check_existence(&self) -> orfail::Result<()> {
         self.0
             .exists()
@@ -216,6 +223,17 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for Position {
 pub struct PositionRange {
     pub start: Position,
     pub end: Position,
+}
+
+impl PositionRange {
+    pub fn is_multiline(self) -> bool {
+        self.end.line > self.start.line
+    }
+
+    pub fn get_start_line(self, full_text: &str) -> Option<&str> {
+        let line = full_text.lines().nth(self.start.line)?.trim_end();
+        Some(line)
+    }
 }
 
 impl nojson::DisplayJson for PositionRange {
