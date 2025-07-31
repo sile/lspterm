@@ -9,7 +9,7 @@ pub const PORT_OPT: noargs::OptSpec = noargs::opt("port")
     .ty("INTEGER")
     .default(DEFAULT_PORT)
     .env("LSPTERM_PORT")
-    .doc("Port number of the LSP proxy server to connect to");
+    .doc("LSP proxy server port");
 
 #[derive(Debug)]
 pub struct ProxyClient {
