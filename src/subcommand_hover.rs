@@ -40,20 +40,20 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let object = JsonObject::new(result.value()).or_fail()?;
     let range: PositionRange = object.convert_required("range").or_fail()?;
     let contents: JsonObject<'_, '_> = object.convert_required("contents").or_fail()?;
-    let hover_text: String = contents.convert_required("value").or_fail()?;
+    let description: String = contents.convert_required("value").or_fail()?;
 
     let text = target.file.read_to_string().or_fail()?;
-    let target_text = range.get_range_text(&text).or_fail()?;
+    let symbol = range.get_range_text(&text).or_fail()?;
     println!(
         "{}",
         nojson::json(|f| {
             f.set_indent_size(2);
             f.set_spacing(true);
             f.object(|f| {
-                f.member("symbol", target_text)?;
+                f.member("symbol", symbol)?;
                 f.member(
                     "description",
-                    nojson::array(|f| f.elements(hover_text.lines())),
+                    nojson::array(|f| f.elements(description.lines())),
                 )
             })
         })
