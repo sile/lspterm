@@ -2,7 +2,7 @@ use orfail::OrFail;
 
 use crate::{
     args::{APPLY_FLAG, RAW_FLAG},
-    document::{DocumentChange, DocumentChanges, TextEdit},
+    document::{DocumentChange, DocumentChanges},
     proxy_client::{PORT_OPT, ProxyClient},
     target::{TARGET_OPT, TargetLocation},
 };
@@ -46,14 +46,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let document_changes = DocumentChanges::try_from(result.value())
         .or_fail_with(|e| format!("Failed to parse document changes: {}", e))?;
     if !raw {
-        println!(
-            "{}",
-            nojson::json(|f| {
-                f.set_indent_size(2);
-                f.set_spacing(true);
-                fmt_document_changes(f, &document_changes)
-            })
-        );
+        print_markdown_changes(&document_changes, !apply);
     }
 
     if apply {
@@ -64,65 +57,62 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     Ok(None)
 }
 
-fn fmt_document_changes(
-    f: &mut nojson::JsonFormatter<'_, '_>,
-    document_changes: &DocumentChanges,
-) -> std::fmt::Result {
+fn print_markdown_changes(document_changes: &DocumentChanges, dry_run: bool) {
     let base_dir = std::env::current_dir().unwrap_or_default();
-    f.object(|f| {
-        for change in &document_changes.changes {
-            match change {
-                DocumentChange::TextDocument(text_change) => {
-                    let Ok(text) = text_change.text_document.uri.read_to_string() else {
-                        continue;
-                    };
-                    let path = text_change.text_document.uri.relative_path(&base_dir);
-                    for edit in &text_change.edits {
-                        f.member(
-                            format!(
-                                "{}:{}:{}",
-                                path.display(),
-                                edit.range.start.line + 1,
-                                edit.range.start.character + 1
-                            ),
-                            nojson::json(|f| fmt_text_edit(f, &text, edit)),
-                        )?;
+
+    println!(
+        "# Rename Changes{}\n",
+        if dry_run { " (dry-run)" } else { "" }
+    );
+
+    for change in &document_changes.changes {
+        match change {
+            DocumentChange::TextDocument(text_change) => {
+                let Ok(text) = text_change.text_document.uri.read_to_string() else {
+                    continue;
+                };
+                let path = text_change.text_document.uri.relative_path(&base_dir);
+
+                println!("## {}\n", path.display());
+
+                for edit in &text_change.edits {
+                    println!(
+                        "### Line {}, Character {}\n",
+                        edit.range.start.line + 1,
+                        edit.range.start.character + 1
+                    );
+
+                    if edit.range.is_multiline() {
+                        println!("```diff");
+                        println!("- [multiline change]");
+                        println!("+ {}", edit.new_text);
+                        println!("```\n");
+                    } else {
+                        let old_line = edit.range.get_start_line(&text).unwrap_or_default();
+                        let new_line = old_line
+                            .chars()
+                            .take(edit.range.start.character)
+                            .chain(edit.new_text.chars())
+                            .chain(old_line.chars().skip(edit.range.end.character))
+                            .collect::<String>();
+
+                        println!("```diff");
+                        println!("- {}", old_line);
+                        println!("+ {}", new_line);
+                        println!("```\n");
                     }
                 }
-                DocumentChange::RenameFile(rename_change) => {
-                    let old_path = rename_change.old_uri.relative_path(&base_dir);
-                    let new_path = rename_change.new_uri.relative_path(&base_dir);
-                    f.member(
-                        format!("{}", old_path.display()),
-                        nojson::json(|f| f.object(|f| f.member("new_path", &new_path))),
-                    )?;
-                }
+            }
+            DocumentChange::RenameFile(rename_change) => {
+                let old_path = rename_change.old_uri.relative_path(&base_dir);
+                let new_path = rename_change.new_uri.relative_path(&base_dir);
+
+                println!("## File Rename\n");
+                println!("```diff");
+                println!("- {}", old_path.display());
+                println!("+ {}", new_path.display());
+                println!("```\n");
             }
         }
-        Ok(())
-    })
-}
-
-fn fmt_text_edit(
-    f: &mut nojson::JsonFormatter<'_, '_>,
-    text: &str,
-    edit: &TextEdit,
-) -> std::fmt::Result {
-    if edit.range.is_multiline() {
-        todo!();
     }
-
-    let old_line = edit.range.get_start_line(text).unwrap_or_default();
-    let new_line = old_line
-        .chars()
-        .take(edit.range.start.character)
-        .chain(edit.new_text.chars())
-        .chain(old_line.chars().skip(edit.range.end.character))
-        .collect::<String>();
-
-    f.object(|f| {
-        f.member("old_line", old_line)?;
-        f.member("new_line", &new_line)?;
-        Ok(())
-    })
 }
