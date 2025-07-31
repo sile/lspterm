@@ -1,76 +1,47 @@
-use std::{io::BufReader, net::TcpStream, path::PathBuf};
-
 use orfail::OrFail;
 
-use crate::lsp::{self, DocumentUri};
+use crate::{
+    args::RAW_FLAG,
+    proxy_client::{PORT_OPT, ProxyClient},
+    target::{TARGET_OPT, TargetLocation},
+};
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
-    if !noargs::cmd("find-def").take(&mut args).is_present() {
+    if !noargs::cmd("definition")
+        .doc("Get definition location for a symbol (textDocument/definition)")
+        .take(&mut args)
+        .is_present()
+    {
         return Ok(Some(args));
     }
 
-    let port: u16 = noargs::opt("port")
-        .short('p')
-        .default("9257")
-        .env("LSPTERM_PORT")
-        .take(&mut args)
-        .then(|a| a.value().parse())?;
-    let file = noargs::arg("FILE")
-        .take(&mut args)
-        .then(|a| a.value().parse::<PathBuf>())?;
-    let line = noargs::arg("LINE")
-        .take(&mut args)
-        .then(|a| a.value().parse::<u32>())?;
-    let character = noargs::arg("CHARACTER")
-        .take(&mut args)
-        .then(|a| a.value().parse::<u32>())?;
+    let target: TargetLocation = TARGET_OPT.take(&mut args).then(|a| a.value().parse())?;
+    let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
+    let raw = RAW_FLAG.take(&mut args).is_present();
 
     if let Some(help) = args.finish()? {
         print!("{help}");
         return Ok(None);
     }
+    target.file.check_existence().or_fail()?;
 
-    let file = DocumentUri::new(file).or_fail()?;
+    let mut client = ProxyClient::connect(port).or_fail()?;
 
-    let mut stream = BufReader::new(TcpStream::connect(("127.0.0.1", port)).or_fail()?);
+    let params = nojson::object(|f| target.fmt_json_object(f));
+    let result = client.call("textDocument/definition", params).or_fail()?;
 
-    // Send definition request
-    let request_id = 1;
-    let params = nojson::object(|f| {
-        f.member("textDocument", nojson::object(|f| f.member("uri", &file)))?;
-        f.member(
-            "position",
-            nojson::object(|f| {
-                f.member("line", line)?;
-                f.member("character", character)
-            }),
-        )
-    });
-
-    lsp::send_request(
-        stream.get_mut(),
-        request_id,
-        "textDocument/definition",
-        params,
-    )
-    .or_fail()?;
-
-    // Receive definition response
-    let response_json = lsp::recv_message(&mut stream).or_fail()?.or_fail()?;
-    let response_value = response_json.value();
-
-    // Check if there's an error in the response
-    if let Some(error) = response_value.to_member("error").or_fail()?.get() {
-        eprintln!("LSP server returned error: {error}");
+    if raw {
+        println!("{result}");
         return Ok(None);
     }
 
-    // Parse and display the result
-    let result = response_value
-        .to_member("result")
-        .or_fail()?
-        .required()
-        .or_fail()?;
+    if result.value().kind().is_null() {
+        println!("Not found");
+        return Ok(None);
+    }
+
+    // TODO: Add formatted output similar to hover subcommand
+    // For now, just print the raw result when not in raw mode
     println!("{result}");
 
     Ok(None)
