@@ -245,26 +245,22 @@ impl PositionRange {
         Some(line)
     }
 
-    fn find_byte_offset(text: &str, target_position: Position) -> Option<usize> {
-        let mut current_position = Position::default();
+    fn find_byte_offset(text: &str, target: Position) -> Option<usize> {
+        let mut current = Position::default();
         for (i, ch) in text.char_indices() {
-            if current_position == target_position {
+            if current == target || (ch == '\n' && current.line == target.line) {
                 return Some(i);
             }
 
             if ch == '\n' {
-                current_position.line += 1;
-                current_position.character = 0;
+                current.line += 1;
+                current.character = 0;
             } else {
-                current_position.character += 1;
+                current.character += 1;
             }
         }
 
-        if current_position == target_position {
-            Some(text.len())
-        } else {
-            None
-        }
+        Some(text.len())
     }
 
     fn get_byte_positions(self, text: &str) -> Option<(usize, usize)> {
