@@ -2,6 +2,13 @@ use std::num::NonZeroUsize;
 
 use crate::lsp::DocumentUri;
 
+pub const TARGET_OPT: noargs::OptSpec = noargs::opt("target")
+    .short('t')
+    .ty("FILE:LINE:CHAR")
+    .env("LSPTERM_TARGET")
+    .example("/path/to/file:1:5")
+    .doc("Target location");
+
 #[derive(Debug, Clone)]
 pub struct TargetLocation {
     pub file: DocumentUri,
@@ -10,13 +17,6 @@ pub struct TargetLocation {
 }
 
 impl TargetLocation {
-    pub const OPT: noargs::OptSpec = noargs::opt("target")
-        .short('t')
-        .ty("FILE:LINE:CHAR")
-        .env("LSPTERM_TARGET")
-        .example("/path/to/file:1:5")
-        .doc("Target location");
-
     pub fn fmt_json_object(
         &self,
         f: &mut nojson::JsonObjectFormatter<'_, '_, '_>,

@@ -1,3 +1,4 @@
+pub mod args;
 pub mod document;
 pub mod json;
 pub mod lsp;

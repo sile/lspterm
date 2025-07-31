@@ -1,9 +1,10 @@
 use orfail::OrFail;
 
 use crate::{
+    args::{APPLY_FLAG, RAW_FLAG},
     document::{DocumentChange, DocumentChanges, TextEdit},
     proxy_client::{PORT_OPT, ProxyClient},
-    target::TargetLocation,
+    target::{TARGET_OPT, TargetLocation},
 };
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -15,20 +16,10 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         return Ok(Some(args));
     }
 
-    let target: TargetLocation = TargetLocation::OPT
-        .take(&mut args)
-        .then(|a| a.value().parse())?;
-    let apply = noargs::flag("apply")
-        .short('a')
-        .doc("Apply the rename changes to files instead of just displaying them")
-        .take(&mut args)
-        .is_present();
-    let raw = noargs::flag("raw")
-        .short('r')
-        .doc("Output raw JSON response from LSP server instead of formatted changes")
-        .take(&mut args)
-        .is_present();
+    let target: TargetLocation = TARGET_OPT.take(&mut args).then(|a| a.value().parse())?;
     let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
+    let apply = APPLY_FLAG.take(&mut args).is_present();
+    let raw = RAW_FLAG.take(&mut args).is_present();
     let new_name: String = noargs::arg("NEW_NAME")
         .doc("New name for the symbol being renamed")
         .example("new-name")
