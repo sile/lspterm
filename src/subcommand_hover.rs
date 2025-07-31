@@ -1,71 +1,60 @@
-use std::{io::BufReader, net::TcpStream, path::PathBuf};
-
 use orfail::OrFail;
 
-use crate::lsp::{self, DocumentUri};
+use crate::{
+    args::RAW_FLAG,
+    json::JsonObject,
+    lsp::PositionRange,
+    proxy_client::{PORT_OPT, ProxyClient},
+    target::{TARGET_OPT, TargetLocation},
+};
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
-    if !noargs::cmd("hover").take(&mut args).is_present() {
+    if !noargs::cmd("hover")
+        .doc("Get hover information for a symbol at the specified location")
+        .take(&mut args)
+        .is_present()
+    {
         return Ok(Some(args));
     }
 
-    let port: u16 = noargs::opt("port")
-        .short('p')
-        .default("9257")
-        .env("LSPTERM_PORT")
-        .take(&mut args)
-        .then(|a| a.value().parse())?;
-    let file = noargs::arg("FILE")
-        .take(&mut args)
-        .then(|a| a.value().parse::<PathBuf>())?;
-    let line = noargs::arg("LINE")
-        .take(&mut args)
-        .then(|a| a.value().parse::<u32>())?;
-    let character = noargs::arg("CHARACTER")
-        .take(&mut args)
-        .then(|a| a.value().parse::<u32>())?;
+    let target: TargetLocation = TARGET_OPT.take(&mut args).then(|a| a.value().parse())?;
+    let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
+    let raw = RAW_FLAG.take(&mut args).is_present();
 
     if let Some(help) = args.finish()? {
         print!("{help}");
         return Ok(None);
     }
+    target.file.check_existence().or_fail()?;
 
-    let file = DocumentUri::new(file).or_fail()?;
+    let mut client = ProxyClient::connect(port).or_fail()?;
 
-    let mut stream = BufReader::new(TcpStream::connect(("127.0.0.1", port)).or_fail()?);
+    let params = nojson::object(|f| target.fmt_json_object(f));
+    let result = client.call("textDocument/hover", params).or_fail()?;
 
-    // Send hover request
-    let request_id = 1;
-    let params = nojson::object(|f| {
-        f.member("textDocument", nojson::object(|f| f.member("uri", &file)))?;
-        f.member(
-            "position",
-            nojson::object(|f| {
-                f.member("line", line)?;
-                f.member("character", character)
-            }),
-        )
-    });
-
-    lsp::send_request(stream.get_mut(), request_id, "textDocument/hover", params).or_fail()?;
-
-    // Receive hover response
-    let response_json = lsp::recv_message(&mut stream).or_fail()?.or_fail()?;
-    let response_value = response_json.value();
-
-    // Check if there's an error in the response
-    if let Some(error) = response_value.to_member("error").or_fail()?.get() {
-        eprintln!("LSP server returned error: {error}");
+    if raw || result.value().kind().is_null() {
+        println!("{result}");
         return Ok(None);
     }
 
-    // Parse and display the result
-    let result = response_value
-        .to_member("result")
-        .or_fail()?
-        .required()
-        .or_fail()?;
-    println!("{result}");
+    let object = JsonObject::new(result.value()).or_fail()?;
+    let range: PositionRange = object.convert_required("range").or_fail()?;
+    let contents: JsonObject<'_, '_> = object.convert_required("contents").or_fail()?;
+    let hover_text: String = contents.convert_required("value").or_fail()?;
+
+    let text = target.file.read_to_string().or_fail()?;
+    let target_text = range.get_range_text(&text).or_fail()?;
+    println!(
+        "{}",
+        nojson::json(|f| {
+            f.set_indent_size(2);
+            f.set_spacing(true);
+            f.object(|f| {
+                f.member("target", target_text)?;
+                f.member("hover", nojson::array(|f| f.elements(hover_text.lines())))
+            })
+        })
+    );
 
     Ok(None)
 }

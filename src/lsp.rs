@@ -230,9 +230,17 @@ impl PositionRange {
         self.end.line > self.start.line
     }
 
-    pub fn get_start_line(self, full_text: &str) -> Option<&str> {
-        let line = full_text.lines().nth(self.start.line)?.trim_end();
+    pub fn get_start_line(self, text: &str) -> Option<&str> {
+        let line = text.lines().nth(self.start.line)?.trim_end();
         Some(line)
+    }
+
+    pub fn get_range_text(self, text: &str) -> Option<&str> {
+        if self.is_multiline() {
+            todo!();
+        }
+        let line = self.get_start_line(text)?;
+        line.get(self.start.character..self.end.character)
     }
 }
 

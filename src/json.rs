@@ -55,3 +55,11 @@ impl<'text, 'raw> JsonObject<'text, 'raw> {
         Ok(self.convert_optional(name)?.unwrap_or_default())
     }
 }
+
+impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for JsonObject<'text, 'raw> {
+    type Error = nojson::JsonParseError;
+
+    fn try_from(value: nojson::RawJsonValue<'text, 'raw>) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
