@@ -249,8 +249,8 @@ impl nojson::DisplayJson for PositionRange {
         let indent = f.get_indent_size();
         f.set_indent_size(0);
         f.object(|f| {
-            f.member("start", &self.start)?;
-            f.member("end", &self.end)
+            f.member("start", self.start)?;
+            f.member("end", self.end)
         })?;
         f.set_indent_size(indent);
         Ok(())

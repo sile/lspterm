@@ -44,7 +44,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     }
 
     let document_changes = DocumentChanges::try_from(result.value())
-        .or_fail_with(|e| format!("Failed to parse document changes: {}", e))?;
+        .or_fail_with(|e| format!("Failed to parse document changes: {e}"))?;
     if !raw {
         print_markdown_changes(&document_changes, !apply);
     }
@@ -97,8 +97,8 @@ fn print_markdown_changes(document_changes: &DocumentChanges, dry_run: bool) {
                             .collect::<String>();
 
                         println!("```diff");
-                        println!("- {}", old_line);
-                        println!("+ {}", new_line);
+                        println!("- {old_line}");
+                        println!("+ {new_line}");
                         println!("```\n");
                     }
                 }

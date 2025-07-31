@@ -171,7 +171,7 @@ pub struct TextEdit {
 impl nojson::DisplayJson for TextEdit {
     fn fmt(&self, f: &mut nojson::JsonFormatter<'_, '_>) -> std::fmt::Result {
         f.object(|f| {
-            f.member("range", &self.range)?;
+            f.member("range", self.range)?;
             f.member("newText", &self.new_text)
         })
     }
@@ -215,7 +215,7 @@ impl DocumentChanges {
             let file_path = uri.path();
 
             // Read file content
-            let content = std::fs::read_to_string(&file_path).or_fail_with(|e| {
+            let content = std::fs::read_to_string(file_path).or_fail_with(|e| {
                 format!("Failed to read file '{}': {}", file_path.display(), e)
             })?;
 
@@ -223,7 +223,7 @@ impl DocumentChanges {
             edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
 
             let applied_content = self.apply_edits(&content, &edits).or_fail()?;
-            std::fs::write(&file_path, applied_content)
+            std::fs::write(file_path, applied_content)
                 .or_fail_with(|e| format!("Failed to write file '{}': {e}", file_path.display()))?;
         }
 
