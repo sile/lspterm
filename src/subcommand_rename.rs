@@ -2,8 +2,7 @@ use orfail::OrFail;
 
 use crate::{
     document::{DocumentChange, DocumentChanges, TextEdit},
-    proxy_client::ProxyClient,
-    proxy_server::DEFAULT_PORT,
+    proxy_client::{PORT_OPT, ProxyClient},
     target::TargetLocation,
 };
 
@@ -34,14 +33,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         .doc("Output raw JSON response from LSP server instead of formatted changes")
         .take(&mut args)
         .is_present();
-    let port: u16 = noargs::opt("port")
-        .short('p')
-        .ty("INTEGER")
-        .default(DEFAULT_PORT)
-        .env("LSPTERM_PORT")
-        .doc("Port number of the LSP proxy server to connect to")
-        .take(&mut args)
-        .then(|a| a.value().parse())?;
+    let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
     let new_name: String = noargs::arg("NEW_NAME")
         .doc("New name for the symbol being renamed")
         .example("new-name")

@@ -2,7 +2,14 @@ use std::{io::BufReader, net::TcpStream};
 
 use orfail::OrFail;
 
-use crate::{json::JsonObject, lsp};
+use crate::{json::JsonObject, lsp, proxy_server::DEFAULT_PORT};
+
+pub const PORT_OPT: noargs::OptSpec = noargs::opt("port")
+    .short('p')
+    .ty("INTEGER")
+    .default(DEFAULT_PORT)
+    .env("LSPTERM_PORT")
+    .doc("Port number of the LSP proxy server to connect to");
 
 #[derive(Debug)]
 pub struct ProxyClient {
