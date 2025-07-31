@@ -4,7 +4,7 @@ use crate::{
     args::{APPLY_FLAG, RAW_FLAG},
     document::{DocumentChange, DocumentChanges},
     proxy_client::{PORT_OPT, ProxyClient},
-    target::{TARGET_OPT, TargetLocation},
+    target::{TARGET_ARG, TargetLocation},
 };
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -16,10 +16,10 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         return Ok(Some(args));
     }
 
-    let target: TargetLocation = TARGET_OPT.take(&mut args).then(|a| a.value().parse())?;
     let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
     let apply = APPLY_FLAG.take(&mut args).is_present();
     let raw = RAW_FLAG.take(&mut args).is_present();
+    let target: TargetLocation = TARGET_ARG.take(&mut args).then(|a| a.value().parse())?;
     let new_name: String = noargs::arg("NEW_NAME")
         .doc("New name for the symbol being renamed")
         .example("new-name")

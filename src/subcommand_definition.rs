@@ -5,7 +5,7 @@ use crate::{
     json::JsonObject,
     lsp::PositionRange,
     proxy_client::{PORT_OPT, ProxyClient},
-    target::{TARGET_OPT, TargetLocation},
+    target::{TARGET_ARG, TargetLocation},
 };
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
@@ -17,9 +17,9 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         return Ok(Some(args));
     }
 
-    let target: TargetLocation = TARGET_OPT.take(&mut args).then(|a| a.value().parse())?;
     let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
     let raw = RAW_FLAG.take(&mut args).is_present();
+    let target: TargetLocation = TARGET_ARG.take(&mut args).then(|a| a.value().parse())?;
 
     if let Some(help) = args.finish()? {
         print!("{help}");
@@ -59,7 +59,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
             println!(); // Add blank line between multiple definitions
         }
 
-        println!("**Definition {}:**", i + 1);
+        println!("## Definition {}:", i + 1);
         println!("- **File:** `{}`", file_path);
         println!(
             "- **Location:** Line {}, Column {}",

@@ -2,12 +2,9 @@ use std::num::NonZeroUsize;
 
 use crate::lsp::DocumentUri;
 
-pub const TARGET_OPT: noargs::OptSpec = noargs::opt("target")
-    .short('t')
-    .ty("FILE:LINE:CHAR")
-    .env("LSPTERM_TARGET")
+pub const TARGET_ARG: noargs::ArgSpec = noargs::arg("TARGET")
     .example("/path/to/file:1:5")
-    .doc("Target location");
+    .doc("Target location (FILE:LINE:CHAR)");
 
 #[derive(Debug, Clone)]
 pub struct TargetLocation {
