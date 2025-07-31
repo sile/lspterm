@@ -12,7 +12,7 @@ fn main() -> noargs::Result<()> {
     let Some(args) = lspterm::subcommand_serve::try_run(args)? else {
         return Ok(());
     };
-    let Some(args) = lspterm::subcommand_find_def::try_run(args)? else {
+    let Some(args) = lspterm::subcommand_definition::try_run(args)? else {
         // textDocument/definition
         return Ok(());
     };
