@@ -9,7 +9,7 @@ use crate::{
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("rename")
-        .doc("Rename a symbol at the specified location")
+        .doc("Rename a symbol (textDocument/rename)")
         .take(&mut args)
         .is_present()
     {

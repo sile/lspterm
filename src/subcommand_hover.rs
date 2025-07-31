@@ -10,7 +10,7 @@ use crate::{
 
 pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawArgs>> {
     if !noargs::cmd("hover")
-        .doc("Get hover information for a symbol at the specified location")
+        .doc("Get hover information for a symbol (textDocument/hover)")
         .take(&mut args)
         .is_present()
     {
