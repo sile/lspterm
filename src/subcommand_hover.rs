@@ -50,8 +50,11 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
             f.set_indent_size(2);
             f.set_spacing(true);
             f.object(|f| {
-                f.member("target", target_text)?;
-                f.member("hover", nojson::array(|f| f.elements(hover_text.lines())))
+                f.member("symbol", target_text)?;
+                f.member(
+                    "description",
+                    nojson::array(|f| f.elements(hover_text.lines())),
+                )
             })
         })
     );
