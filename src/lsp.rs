@@ -188,10 +188,20 @@ impl<'text, 'raw> TryFrom<nojson::RawJsonValue<'text, 'raw>> for DocumentUri {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Position {
     pub line: usize,
     pub character: usize,
+}
+
+impl std::ops::Sub for Position {
+    type Output = Self;
+
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        self.line -= rhs.line;
+        self.character -= rhs.character;
+        self
+    }
 }
 
 impl nojson::DisplayJson for Position {
@@ -235,12 +245,37 @@ impl PositionRange {
         Some(line)
     }
 
-    pub fn get_range_text(self, text: &str) -> Option<&str> {
-        if self.is_multiline() {
-            todo!();
+    fn find_byte_offset(text: &str, target_position: Position) -> Option<usize> {
+        let mut current_position = Position::default();
+        for (i, ch) in text.char_indices() {
+            if current_position == target_position {
+                return Some(i);
+            }
+
+            if ch == '\n' {
+                current_position.line += 1;
+                current_position.character = 0;
+            } else {
+                current_position.character += 1;
+            }
         }
-        let line = self.get_start_line(text)?;
-        line.get(self.start.character..self.end.character)
+
+        if current_position == target_position {
+            Some(text.len())
+        } else {
+            None
+        }
+    }
+
+    fn get_byte_positions(self, text: &str) -> Option<(usize, usize)> {
+        let start = Self::find_byte_offset(text, self.start)?;
+        let end = Self::find_byte_offset(&text[start..], self.end - self.start)? + start;
+        Some((start, end))
+    }
+
+    pub fn get_range_text(self, text: &str) -> Option<&str> {
+        let (start, end) = self.get_byte_positions(text)?;
+        text.get(start..end)
     }
 }
 
