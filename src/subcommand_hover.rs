@@ -32,8 +32,13 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let params = nojson::object(|f| target.fmt_json_object(f));
     let result = client.call("textDocument/hover", params).or_fail()?;
 
-    if raw || result.value().kind().is_null() {
+    if raw {
         println!("{result}");
+        return Ok(None);
+    }
+
+    if result.value().kind().is_null() {
+        println!("Not found");
         return Ok(None);
     }
 
@@ -44,20 +49,9 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     let text = target.file.read_to_string().or_fail()?;
     let symbol = range.get_range_text(&text).or_fail()?;
-    println!(
-        "{}",
-        nojson::json(|f| {
-            f.set_indent_size(2);
-            f.set_spacing(true);
-            f.object(|f| {
-                f.member("symbol", symbol)?;
-                f.member(
-                    "description",
-                    nojson::array(|f| f.elements(description.lines())),
-                )
-            })
-        })
-    );
+
+    println!("# `{symbol}`\n");
+    println!("{description}");
 
     Ok(None)
 }
