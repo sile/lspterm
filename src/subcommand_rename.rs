@@ -15,12 +15,7 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
         return Ok(Some(args));
     }
 
-    let target: TargetLocation = noargs::opt("target")
-        .short('t')
-        .ty("FILE[:LINE[:CHAR]]")
-        .env("LSPTERM_TARGET")
-        .example("/path/to/file:1:5")
-        .doc("Target location for rename")
+    let target: TargetLocation = TargetLocation::OPT
         .take(&mut args)
         .then(|a| a.value().parse())?;
     let apply = noargs::flag("apply")

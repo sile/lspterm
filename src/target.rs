@@ -10,6 +10,13 @@ pub struct TargetLocation {
 }
 
 impl TargetLocation {
+    pub const OPT: noargs::OptSpec = noargs::opt("target")
+        .short('t')
+        .ty("FILE:LINE:CHAR")
+        .env("LSPTERM_TARGET")
+        .example("/path/to/file:1:5")
+        .doc("Target location");
+
     pub fn fmt_json_object(
         &self,
         f: &mut nojson::JsonObjectFormatter<'_, '_, '_>,
@@ -39,12 +46,12 @@ impl std::str::FromStr for TargetLocation {
         let file = DocumentUri::new(file)
             .map_err(|e| format!("invalid file path '{file}': {}", e.message))?;
 
-        let line_str = tokens.next().unwrap_or("1");
+        let line_str = tokens.next().unwrap_or("1"); // TODO: non optional
         let line = line_str
             .parse::<NonZeroUsize>()
             .map_err(|_| format!("invalid line number '{line_str}': must be a positive integer"))?;
 
-        let character_str = tokens.next().unwrap_or("1");
+        let character_str = tokens.next().unwrap_or("1"); // TODO: non optional
         let character = character_str.parse::<NonZeroUsize>().map_err(|_| {
             format!("invalid column number '{character_str}': must be a positive integer")
         })?;
