@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use orfail::OrFail;
 
 use crate::{
@@ -18,6 +20,13 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     }
 
     let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
+    let context_lines: NonZeroUsize = noargs::opt("context")
+        .short('c')
+        .ty("INTEGER")
+        .default("5")
+        .doc("Number of lines of context to show around the definition")
+        .take(&mut args)
+        .then(|a| a.value().parse())?;
     let raw = RAW_FLAG.take(&mut args).is_present();
     let target: TargetLocation = TARGET_ARG.take(&mut args).then(|a| a.value().parse())?;
 
@@ -65,17 +74,27 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
             target_selection_range.start.character + 1
         );
 
-        let context_lines = 5;
-        let mut context_range = target_selection_range;
-        context_range.start.line = context_range.start.line.saturating_sub(context_lines);
-        context_range.start.character = 0;
-        context_range.end.line += context_lines;
-        context_range.end.character = usize::MAX;
-
-        dbg!(context_range);
-        let context_text = context_range.get_range_text(&target_text).or_fail()?;
         println!("```");
-        println!("{context_text}");
+        let lines = target_text.lines().collect::<Vec<_>>();
+        for line in target_selection_range
+            .start
+            .line
+            .saturating_sub(context_lines.get())
+            ..=target_selection_range.end.line + context_lines.get()
+        {
+            let Some(line_str) = lines.get(line) else {
+                continue;
+            };
+
+            println!(
+                "{} {line_str}",
+                if line == target_selection_range.start.line {
+                    '>'
+                } else {
+                    ' '
+                },
+            );
+        }
         println!("```");
         println!();
     }
