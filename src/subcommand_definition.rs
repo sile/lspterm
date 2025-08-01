@@ -22,8 +22,9 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
     let port: u16 = PORT_OPT.take(&mut args).then(|a| a.value().parse())?;
     let context_lines: NonZeroUsize = noargs::opt("context")
         .short('c')
-        .ty("INTEGER")
+        .ty("LINES")
         .default("5")
+        .env("LSPTERM_CONTEXT_LINES")
         .doc("Number of lines of context to show around the definition")
         .take(&mut args)
         .then(|a| a.value().parse())?;
