@@ -35,14 +35,10 @@ fn main() -> noargs::Result<()> {
 
     // MEMO:
     // - textDocument/references
-    // - textDocument/documentSymbol
-    // - textDocument/formatting
     // - workspace/symbol
     // - textDocument/implementation
     // - textDocument/typeDefinition
     // - textDocument/declaration
-    // - textDocument/documentHighlight
-    // - workspace/willRenameFiles
 
     if let Some(help) = args.finish()? {
         print!("{help}");
