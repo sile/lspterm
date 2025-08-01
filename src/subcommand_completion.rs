@@ -29,7 +29,11 @@ pub fn try_run(mut args: noargs::RawArgs) -> noargs::Result<Option<noargs::RawAr
 
     let mut client = ProxyClient::connect(port).or_fail()?;
 
-    let params = nojson::object(|f| target.fmt_json_object(f));
+    let params = nojson::object(|f| {
+        //f.member("context", nojson::object(|f| f.member("triggerKind", 3)))?;
+        f.member("context", nojson::object(|f| f.member("triggerKind", 1)))?;
+        target.fmt_json_object(f)
+    });
     let result = client.call("textDocument/completion", params).or_fail()?;
 
     if raw {
