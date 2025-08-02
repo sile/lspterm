@@ -1,4 +1,4 @@
-# lspterm (or ler or leri)
+# lspterm
 
 ```sh
 $ git grep --column -n '. */[*][*]/'
